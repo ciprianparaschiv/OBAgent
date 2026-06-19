@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Studio Staffing Agent — local</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.3rem; margin-bottom: .15rem; }
+  .sub { color: #888; margin-top: 0; font-size: .85rem; }
+  .bar { display: flex; gap: .5rem; align-items: center; font-size: .8rem; color: #888;
+         background: #8881; border-radius: 8px; padding: .5rem .7rem; margin: 1rem 0; }
+  .bar input { flex: 1; font: inherit; font-size: .8rem; padding: .3rem .5rem; border-radius: 6px;
+               border: 1px solid #8884; background: transparent; color: inherit; }
+  .dot { width: .6rem; height: .6rem; border-radius: 50%; background: #c44; flex: 0 0 auto; }
+  .dot.ok { background: #3a3; }
+  textarea { width: 100%; box-sizing: border-box; padding: .7rem; border-radius: 8px;
+             border: 1px solid #8884; font: inherit; min-height: 4.5rem; background: transparent; color: inherit; }
+  button { margin-top: .6rem; padding: .55rem 1.1rem; border: 0; border-radius: 8px;
+           background: #2d6cdf; color: #fff; font: inherit; cursor: pointer; }
+  button[disabled] { opacity: .5; cursor: default; }
+  .examples { margin: .6rem 0 0; font-size: .85rem; }
+  .examples a { color: #2d6cdf; cursor: pointer; text-decoration: underline; display: block; margin:.1rem 0; }
+  #answer { white-space: pre-wrap; background: #8881; border-radius: 8px; padding: 1rem;
+            margin-top: 1.2rem; min-height: 2rem; }
+  #trace { font-size: .8rem; color: #888; margin-top: .6rem; word-break: break-all; }
+  .note { font-size: .75rem; color: #999; border-top: 1px solid #8883; margin-top: 2rem; padding-top: .6rem; }
+  code { background:#8882; padding:.05rem .3rem; border-radius:4px; }
+</style>
+</head>
+<body>
+<h1>Studio Staffing Agent</h1>
+<p class="sub">read-only · the database stays on your machine · model: <span id="model">…</span></p>
+
+<div class="bar">
+  <span class="dot" id="dot"></span>
+  <label for="api">Local API:</label>
+  <input id="api" spellcheck="false">
+  <span id="status">checking…</span>
+</div>
+
+<textarea id="q" placeholder="Ask in plain language… (⌘/Ctrl + Enter to send)"></textarea>
+<div class="examples">
+  <a onclick="setq(this)">What past projects are most similar to an email marketing newsletter design for a tech brand, and who worked on them?</a>
+  <a onclick="setq(this)">Find landing page projects for Logitech and who worked on them</a>
+  <a onclick="setq(this)">What has Floris Olaru worked on recently?</a>
+</div>
+<button id="go" onclick="ask()">Ask</button>
+
+<div id="trace"></div>
+<div id="answer"></div>
+
+<p class="note">This page is just a UI. It talks to a backend you run locally
+(<code>studio-web</code>), which reads the local PMS snapshot. No project data leaves your machine.
+A human makes every staffing decision.</p>
+
+<script>
+  // When this page is served from localhost (the bundled backend), use same origin.
+  // When served from a hosted git URL, default to the local backend.
+  const isLocal = ['localhost','127.0.0.1'].includes(location.hostname);
+  const DEFAULT_API = isLocal ? location.origin : 'http://localhost:8000';
+  const apiInput = document.getElementById('api');
+  apiInput.value = localStorage.getItem('ob_api') || DEFAULT_API;
+
+  function api(){ return apiInput.value.replace(/\/$/, ''); }
+  apiInput.addEventListener('change', () => { localStorage.setItem('ob_api', api()); checkConn(); });
+
+  function setq(a){ document.getElementById('q').value = a.textContent; }
+
+  async function checkConn(){
+    const dot = document.getElementById('dot'), st = document.getElementById('status');
+    try {
+      const r = await fetch(api() + '/config', {cache:'no-store'});
+      const d = await r.json();
+      document.getElementById('model').textContent = d.model || 'unknown';
+      dot.classList.add('ok'); st.textContent = 'connected';
+    } catch(e) {
+      dot.classList.remove('ok');
+      st.textContent = 'not reachable — run `studio-web` locally';
+      document.getElementById('model').textContent = '—';
+    }
+  }
+
+  async function ask(){
+    const q = document.getElementById('q').value.trim();
+    if(!q) return;
+    const btn = document.getElementById('go'), ans = document.getElementById('answer'), tr = document.getElementById('trace');
+    btn.disabled = true; ans.textContent = ''; tr.textContent = 'thinking…';
+    try {
+      const r = await fetch(api() + '/ask', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({question:q})});
+      const d = await r.json();
+      if(d.error){ ans.textContent = 'Error: ' + d.error; tr.textContent=''; }
+      else {
+        tr.textContent = (d.trace && d.trace.length)
+          ? 'tools: ' + d.trace.map(t => t.tool + '(' + JSON.stringify(t.args) + ')').join('  →  ')
+          : 'no tools called';
+        ans.textContent = d.answer || '(no answer)';
+      }
+    } catch(e){
+      ans.textContent = 'Request failed: ' + e + '\n\nIs the local backend running? (studio-web)';
+      tr.textContent='';
+    }
+    btn.disabled = false;
+  }
+
+  document.getElementById('q').addEventListener('keydown', e => {
+    if((e.metaKey||e.ctrlKey) && e.key === 'Enter') ask();
+  });
+  checkConn();
+</script>
+</body>
+</html>
