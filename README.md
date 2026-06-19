@@ -57,6 +57,11 @@ Natural-language version via the model (needs `OPENAI_API_KEY` in `.env`):
 studio-agent "what past projects are most similar to an email newsletter design for a tech brand, and who worked on them?"
 ```
 
+Dev model is set by config only (provider-agnostic). The current default is
+Google Gemini's free tier (`gemini-2.5-flash`, free key from
+https://aistudio.google.com/apikey); swap to Anthropic / Groq / a local Ollama
+server by editing the three `OPENAI_*` lines in `.env` — no code change.
+
 ## Data-model notes (phase one)
 
 - `assignment` table is **empty** — "who worked on a project" is derived from

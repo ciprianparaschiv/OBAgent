@@ -30,9 +30,11 @@ class LLMSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="OPENAI_", env_file=".env", extra="ignore")
 
-    base_url: str = "https://api.anthropic.com/v1/"
+    # Defaults target Google Gemini's free, OpenAI-compatible endpoint; override
+    # in .env to point at any other provider or a local open-model server.
+    base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
     api_key: str = ""
-    model: str = "claude-opus-4-8"
+    model: str = "gemini-2.5-flash"
 
 
 @lru_cache

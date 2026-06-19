@@ -15,7 +15,7 @@ from .config import llm_settings
 
 def make_client() -> OpenAI:
     cfg = llm_settings()
-    if not cfg.api_key or cfg.api_key.startswith("sk-REPLACE"):
+    if not cfg.api_key or "REPLACE" in cfg.api_key:
         raise RuntimeError(
             "OPENAI_API_KEY is not set. Copy .env.example to .env and fill it in."
         )
