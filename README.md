@@ -37,6 +37,38 @@ cp .env.example .env   # fill in OPENAI_API_KEY
 uv run pytest
 ```
 
+> Note: on this machine MySQL runs via Homebrew (`mysql@8.0`), because Docker Hub
+> pulls are blocked by Docker Desktop's hub-proxy. `docker-compose.yml` is kept
+> for environments where the registry is reachable; `import_snapshot.sh` auto-picks
+> the backend (`BACKEND=brew|docker` to force one).
+
+## Prove the slice
+
+Deterministic proof (no API key needed) — runs the tool pipeline through the MCP
+server and shows similar past projects + who worked on them:
+
+```bash
+.venv/bin/python scripts/prove_slice.py "a Meta ads landing page for a health brand"
+```
+
+Natural-language version via the model (needs `OPENAI_API_KEY` in `.env`):
+
+```bash
+studio-agent "what past projects are most similar to an email newsletter design for a tech brand, and who worked on them?"
+```
+
+## Data-model notes (phase one)
+
+- `assignment` table is **empty** — "who worked on a project" is derived from
+  `timing` (actual logged hours); `project.project_users_responsable` is the lead.
+- Discipline/type comes from `worktype`→`ptype` (the `project.project_type` column
+  is orphaned and unreliable).
+- "Real" projects = `project_deleted = 0` (`project_status` is ~99% one value).
+- Mixed text encodings: older rows are cp1252, newer `[RO]` rows are UTF-8 stored
+  in latin1; the connector repairs the latter on read.
+- "Similar" is currently lexical (name + description). Semantic/vector search is a
+  later slice.
+
 ## Constraints
 
 - Read-only throughout. Local DB user is granted `SELECT` only.
