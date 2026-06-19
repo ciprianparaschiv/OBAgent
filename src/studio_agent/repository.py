@@ -13,9 +13,15 @@ These functions return JSON-serialisable dicts and contain no MCP/agent concepts
 from __future__ import annotations
 
 import datetime as _dt
+import time as _time
 from typing import Any
 
 from .db import query, query_one
+
+
+def _now() -> float:
+    """Current unix time (wall clock). Isolated for clarity/testing."""
+    return _time.time()
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -222,8 +228,18 @@ def get_project(project_id: int) -> dict[str, Any] | None:
     return _deep_clean(p)
 
 
-def list_person_projects(name_or_id: str | int, limit: int = 25) -> dict[str, Any]:
-    """A person's past projects: those they logged time on (and/or led)."""
+def list_person_projects(
+    name_or_id: str | int,
+    limit: int = 25,
+    since_days: int | None = None,
+) -> dict[str, Any]:
+    """A person's projects, ordered by most recent activity (when they logged time).
+
+    ``since_days``: if set, only include projects the person logged time on within
+    the last N days, and window the hours/entries to that period (so "last 7 days"
+    -> since_days=7). Each project includes ``last_worked`` (date of their most
+    recent time entry) and ``date`` (the project's creation date).
+    """
     person = resolve_person(name_or_id)
     if not person:
         # Surface candidates so the caller (agent) can disambiguate.
@@ -237,6 +253,18 @@ def list_person_projects(name_or_id: str | int, limit: int = 25) -> dict[str, An
         }
 
     uid = person["user_id"]
+    # Time window: relative to wall-clock now (in prod this tracks the live clock;
+    # for a fresh snapshot the latest activity is ~now). Filtering on timing_end
+    # both selects projects worked in the window and windows the hours/entries.
+    params: list[Any] = [uid, uid]
+    window_clause = ""
+    cutoff: int | None = None
+    if since_days is not None:
+        cutoff = int(_now() - int(since_days) * 86400)
+        window_clause = "AND t.timing_end >= %s"
+        params.append(cutoff)
+    params.append(int(limit))
+
     projects = query(
         f"""SELECT p.project_id,
                    p.project_name    AS name,
@@ -245,28 +273,33 @@ def list_person_projects(name_or_id: str | int, limit: int = 25) -> dict[str, An
                    p.project_date    AS date_ts,
                    COUNT(*)          AS time_entries,
                    SUM(GREATEST(t.timing_end - t.timing_start, 0)) AS seconds,
+                   MAX(t.timing_end) AS last_ts,
                    (p.project_users_responsable = %s) AS is_lead
               FROM timing t
               JOIN project p ON p.project_id = t.timing_project
               LEFT JOIN client c ON c.client_id = p.project_client
              WHERE t.timing_user = %s AND p.project_deleted = 0
+                   {window_clause}
              GROUP BY p.project_id, p.project_name, c.client_name, p.project_date,
                       p.project_users_responsable
-             ORDER BY p.project_date DESC
+             ORDER BY last_ts DESC
              LIMIT %s""",
-        (uid, uid, int(limit)),
+        params,
     )
     for r in projects:
         r["date"] = _iso(r.pop("date_ts"))
+        r["last_worked"] = _iso(r.pop("last_ts"))
         r["hours"] = _hours(r.pop("seconds"))
         r["is_lead"] = bool(r["is_lead"])
-    return _deep_clean(
-        {
-            "person": {
-                "user_id": person["user_id"],
-                "name": person["user_name"],
-                "email": person.get("user_email"),
-            },
-            "projects": projects,
-        }
-    )
+    result: dict[str, Any] = {
+        "person": {
+            "user_id": person["user_id"],
+            "name": person["user_name"],
+            "email": person.get("user_email"),
+        },
+        "projects": projects,
+    }
+    if since_days is not None:
+        result["window_days"] = int(since_days)
+        result["since"] = _iso(cutoff)
+    return _deep_clean(result)

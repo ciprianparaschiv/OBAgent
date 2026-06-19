@@ -59,6 +59,29 @@ def test_latin1_text_decodes_to_unicode():
     assert "’" in proj["name"], f"expected smart quote in {proj['name']!r}"
 
 
+def test_person_projects_ordered_by_recent_activity_with_last_worked():
+    res = repo.list_person_projects(37, limit=50)  # user 37 has logged time
+    projects = res["projects"]
+    assert projects and all(p.get("last_worked") for p in projects)
+    last = [p["last_worked"] for p in projects]
+    assert last == sorted(last, reverse=True), "should be ordered by most recent activity"
+
+
+def test_person_projects_since_days_window(monkeypatch):
+    # Pin "now" to the snapshot's latest activity so the window is deterministic
+    # regardless of when the test runs.
+    latest = repo.query_one("SELECT MAX(timing_end) AS m FROM timing")["m"]
+    monkeypatch.setattr(repo, "_now", lambda: float(latest))
+
+    all_projects = repo.list_person_projects(37, limit=50)["projects"]
+    win = repo.list_person_projects(37, since_days=7)
+
+    assert win["window_days"] == 7 and win["since"]
+    assert len(win["projects"]) <= len(all_projects)
+    # Every windowed project's most recent activity is within the window.
+    assert all(p["last_worked"] >= win["since"] for p in win["projects"])
+
+
 def test_double_encoded_text_is_repaired():
     # Newer [RO] rows are UTF-8 stored into latin1 ("Levi’s" -> "Leviâ€™s").
     # The repository should repair the mojibake on the way out.

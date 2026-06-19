@@ -41,14 +41,21 @@ def get_project(project_id: int) -> dict[str, Any] | None:
 
 
 @mcp.tool()
-def list_person_projects(person: str, limit: int = 25) -> dict[str, Any]:
-    """A person's past projects (those they logged time on), most recent first.
+def list_person_projects(
+    person: str, limit: int = 25, since_days: int | None = None
+) -> dict[str, Any]:
+    """A person's projects, ordered by most recent activity (when they logged time).
 
     ``person`` may be a user id or a name. If the name is ambiguous, returns
     ``person: null`` with a ``candidates`` list to disambiguate; call again with a
     full name or the user id.
+
+    For recency questions ("what has X worked on lately / in the last week"), set
+    ``since_days`` (e.g. 7 for the last week, 30 for the last month). Results are
+    then limited to projects worked on in that window, with hours windowed to it.
+    Each project includes ``last_worked`` (date of their most recent time entry).
     """
-    return repo.list_person_projects(person, limit=limit)
+    return repo.list_person_projects(person, limit=limit, since_days=since_days)
 
 
 def main() -> None:

@@ -14,6 +14,7 @@ Run:  studio-agent "what past projects are like X and who worked on them?"
 from __future__ import annotations
 
 import asyncio
+import datetime as _dt
 import json
 import sys
 from contextlib import asynccontextmanager
@@ -39,6 +40,11 @@ the lead).
   3. Summarise the closest projects with their client, date and discipline, and \
 list the people who worked on them (with hours where useful). Reference projects \
 by name and id.
+
+For recency questions ("what has X worked on lately / in the last week / this \
+month"), call list_person_projects with since_days (7 = last week, 30 = last \
+month); it returns only projects worked in that window, ordered by most recent \
+activity, with a last_worked date. State the window you used.
 
 If a person's name is ambiguous, the tool returns candidates — pick the most \
 likely or ask which one. Keep answers concise and grounded in the data."""
@@ -129,9 +135,10 @@ async def run(
     client = make_client()
     model = model_name()
 
+    today = _dt.datetime.now().strftime("%Y-%m-%d")
     async with connect_tools() as tools:
         messages: list[dict[str, Any]] = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": f"{SYSTEM_PROMPT}\n\nToday's date is {today}."},
             {"role": "user", "content": question},
         ]
 
