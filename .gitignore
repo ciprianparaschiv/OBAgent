@@ -216,3 +216,20 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- Studio Staffing Agent: local-only data (never commit; never leaves this machine) ---
+# Database snapshot(s) imported into the local MySQL copy
+*.sql
+*.sql.gz
+*.dump
+# Local data, fixtures, exports
+/data/
+# Vector index (built locally, real data)
+/index/
+*.faiss
+*.index
+# MySQL docker volume mount (if bind-mounted locally)
+/.mysql-data/
+
+# Local Claude Code settings
+.claude/settings.local.json

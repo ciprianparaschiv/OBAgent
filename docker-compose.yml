@@ -1,0 +1,30 @@
+# Local MySQL for developing against a copy of the production snapshot.
+# Same engine family as production (MySQL on cPanel). Disposable: `docker compose down -v`.
+services:
+  db:
+    image: mysql:8.0
+    container_name: studio_pms_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pw
+      MYSQL_DATABASE: studio_pms
+      MYSQL_USER: studio_ro
+      MYSQL_PASSWORD: studio_ro_pw
+    command:
+      # Legacy data is often latin1; keep the server permissive for the import.
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      # Old dumps frequently rely on these being relaxed.
+      - --sql-mode=NO_ENGINE_SUBSTITUTION
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot_pw"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  db_data:
