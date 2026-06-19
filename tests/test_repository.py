@@ -57,3 +57,13 @@ def test_latin1_text_decodes_to_unicode():
     proj = repo.get_project(13449)
     assert proj is not None
     assert "’" in proj["name"], f"expected smart quote in {proj['name']!r}"
+
+
+def test_double_encoded_text_is_repaired():
+    # Newer [RO] rows are UTF-8 stored into latin1 ("Levi’s" -> "Leviâ€™s").
+    # The repository should repair the mojibake on the way out.
+    rows = repo.search_projects("Levi Campaign Email", limit=10)
+    assert rows, "expected Levi campaign email projects"
+    joined = " ".join(r["name"] for r in rows)
+    assert "â€" not in joined, f"mojibake leaked through: {joined!r}"
+    assert any("Levi’s" in r["name"] for r in rows)

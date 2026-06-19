@@ -37,6 +37,34 @@ def _hours(seconds: Any) -> float:
     return round(float(seconds or 0) / 3600.0, 1)
 
 
+# Mojibake markers from UTF-8 text mistakenly stored in a latin1 column
+# (e.g. "Levi’s" -> "Leviâ€™s"). Older rows are correctly cp1252 and are left
+# alone; the cp1252->utf-8 round-trip below self-validates, so clean text that
+# merely contains one of these bytes (a lone Romanian "â") fails the decode and
+# passes through unchanged.
+_MOJIBAKE_MARKERS = ("â€", "Ã", "Â", "â‚¬")
+
+
+def _clean_text(s: Any) -> Any:
+    if not isinstance(s, str) or not any(m in s for m in _MOJIBAKE_MARKERS):
+        return s
+    try:
+        return s.encode("cp1252").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return s
+
+
+def _deep_clean(obj: Any) -> Any:
+    """Recursively repair double-encoded text in a result structure."""
+    if isinstance(obj, str):
+        return _clean_text(obj)
+    if isinstance(obj, list):
+        return [_deep_clean(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: _deep_clean(v) for k, v in obj.items()}
+    return obj
+
+
 # Reusable correlated subqueries.
 _DISCIPLINE_SQL = """
     (SELECT GROUP_CONCAT(DISTINCT pt.ptype_name ORDER BY pt.ptype_name SEPARATOR ', ')
@@ -147,7 +175,7 @@ def search_projects(query_text: str, limit: int = 10) -> list[dict[str, Any]]:
     rows = query(sql, params)
     for r in rows:
         r["date"] = _iso(r.pop("date_ts"))
-    return rows
+    return _deep_clean(rows)
 
 
 def get_project(project_id: int) -> dict[str, Any] | None:
@@ -191,7 +219,7 @@ def get_project(project_id: int) -> dict[str, Any] | None:
     for person in p["people"]:
         person["hours"] = _hours(person.pop("seconds"))
         person["is_lead"] = person["user_id"] == p.get("lead_user_id")
-    return p
+    return _deep_clean(p)
 
 
 def list_person_projects(name_or_id: str | int, limit: int = 25) -> dict[str, Any]:
@@ -232,11 +260,13 @@ def list_person_projects(name_or_id: str | int, limit: int = 25) -> dict[str, An
         r["date"] = _iso(r.pop("date_ts"))
         r["hours"] = _hours(r.pop("seconds"))
         r["is_lead"] = bool(r["is_lead"])
-    return {
-        "person": {
-            "user_id": person["user_id"],
-            "name": person["user_name"],
-            "email": person.get("user_email"),
-        },
-        "projects": projects,
-    }
+    return _deep_clean(
+        {
+            "person": {
+                "user_id": person["user_id"],
+                "name": person["user_name"],
+                "email": person.get("user_email"),
+            },
+            "projects": projects,
+        }
+    )
