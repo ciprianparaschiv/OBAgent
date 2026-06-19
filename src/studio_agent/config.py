@@ -21,8 +21,12 @@ class DBSettings(BaseSettings):
     user: str = "studio_ro"
     password: str = "studio_ro_pw"
     name: str = "studio_pms"
-    # Legacy PMS rows may be stored as latin1; default accordingly but overridable.
-    charset: str = "latin1"
+    # Tables are latin1, but we connect as utf8mb4 so MySQL converts text
+    # server-side. The strict client-side cp1252 codec (what charset="latin1"
+    # uses) raises on bytes undefined in cp1252 (0x81/0x8d/0x8f/0x90/0x9d), which
+    # real rows contain; utf8mb4 is lenient. Double-encoded rows are still
+    # repaired in the repository.
+    charset: str = "utf8mb4"
 
 
 class LLMSettings(BaseSettings):

@@ -1,12 +1,15 @@
 """Integration tests for the PMS repository against the local snapshot."""
 
-from studio_agent import repository as repo
+import pytest
+
+from studio_agent import index, repository as repo
 
 
-def test_search_projects_scored_and_relevant():
-    rows = repo.search_projects("landing page", limit=5)
+def test_lexical_search_scored_and_relevant():
+    rows = repo.search_projects("landing page", limit=5, mode="lexical")
     assert rows, "expected matches for 'landing page'"
     assert all("score" in r and r["score"] > 0 for r in rows)
+    assert all(r["match"] == "lexical" for r in rows)
     # Results should mention the query terms somewhere in the name (lexical).
     assert any("landing" in (r["name"] or "").lower() for r in rows)
     # Ordered by score descending.
@@ -19,7 +22,7 @@ def test_search_empty_query_returns_nothing():
 
 
 def test_get_project_includes_people_and_lead():
-    hit = repo.search_projects("landing page", limit=1)[0]
+    hit = repo.search_projects("landing page", limit=1, mode="lexical")[0]
     proj = repo.get_project(hit["project_id"])
     assert proj is not None
     assert proj["project_id"] == hit["project_id"]
@@ -85,8 +88,38 @@ def test_person_projects_since_days_window(monkeypatch):
 def test_double_encoded_text_is_repaired():
     # Newer [RO] rows are UTF-8 stored into latin1 ("Levi’s" -> "Leviâ€™s").
     # The repository should repair the mojibake on the way out.
-    rows = repo.search_projects("Levi Campaign Email", limit=10)
+    rows = repo.search_projects("Levi Campaign Email", limit=10, mode="lexical")
     assert rows, "expected Levi campaign email projects"
     joined = " ".join(r["name"] for r in rows)
     assert "â€" not in joined, f"mojibake leaked through: {joined!r}"
     assert any("Levi’s" in r["name"] for r in rows)
+
+
+# --- semantic search (skipped unless the local index is built) -------------
+
+needs_index = pytest.mark.skipif(not index.available(), reason="semantic index not built")
+
+
+@needs_index
+def test_semantic_search_returns_scored_matches():
+    rows = repo.search_projects("email newsletter design", limit=5, mode="semantic")
+    assert rows, "expected semantic matches"
+    assert all(r["match"] == "semantic" for r in rows)
+    assert all(0.0 <= r["score"] <= 1.0001 for r in rows)
+    scores = [r["score"] for r in rows]
+    assert scores == sorted(scores, reverse=True)
+
+
+@needs_index
+def test_semantic_finds_without_shared_keywords():
+    # "video ads for social media" should surface social-creative/video work
+    # even though the wording differs from project names.
+    rows = repo.search_projects("promotional video clips for social media", limit=10, mode="semantic")
+    blob = " ".join((r["name"] or "").lower() for r in rows)
+    assert any(w in blob for w in ("social", "video", "creative", "ad"))
+
+
+def test_search_auto_falls_back_to_lexical_without_index(monkeypatch):
+    monkeypatch.setattr(index, "available", lambda: False)
+    rows = repo.search_projects("landing page", limit=3, mode="auto")
+    assert rows and all(r["match"] == "lexical" for r in rows)

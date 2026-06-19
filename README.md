@@ -86,8 +86,19 @@ server by editing the three `OPENAI_*` lines in `.env` — no code change.
 - "Real" projects = `project_deleted = 0` (`project_status` is ~99% one value).
 - Mixed text encodings: older rows are cp1252, newer `[RO]` rows are UTF-8 stored
   in latin1; the connector repairs the latter on read.
-- "Similar" is currently lexical (name + description). Semantic/vector search is a
-  later slice.
+- "Similar" uses **semantic** search when the local index is built (meaning-based,
+  via local embeddings), falling back to lexical keyword search otherwise. Each
+  result carries a `match` field showing which was used.
+
+## Semantic index (optional)
+
+```bash
+uv pip install -e ".[index]"   # local embeddings (sentence-transformers); no API key
+studio-index                   # build index/ from the snapshot (gitignored, ~53MB)
+```
+
+The index is built locally and never leaves the machine. Without it, search
+falls back to keyword matching automatically.
 
 ## Constraints
 

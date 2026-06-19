@@ -4,9 +4,11 @@ Two layers of read-only protection:
   1. The DB user is granted ``SELECT`` only (see scripts/import_snapshot.sh).
   2. ``query()`` rejects any statement that isn't a read.
 
-Encoding note: the legacy tables are MySQL ``latin1`` (effectively cp1252).
-PyMySQL maps that to Python's cp1252 codec, so smart quotes / dashes come back
-as correct Unicode with ``charset="latin1"`` — no manual fix-ups needed.
+Encoding note: the legacy tables are MySQL ``latin1`` (effectively cp1252). We
+connect as ``utf8mb4`` so MySQL converts text server-side — the strict client
+cp1252 codec used by ``charset="latin1"`` raises on bytes undefined in cp1252
+(0x81/0x8d/0x8f/0x90/0x9d) that real rows contain. Double-encoded rows (UTF-8
+stored in latin1) are repaired in ``repository._clean_text``.
 """
 
 from __future__ import annotations

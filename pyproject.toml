@@ -23,12 +23,19 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
 ]
+# Semantic search via LOCAL embeddings (no API key; runs and stays on this
+# machine). Heavier install (pulls torch); kept optional so the base stays light.
+index = [
+    "sentence-transformers>=2.2",
+    "numpy>=1.24",
+]
 
 [project.scripts]
 # Convenience entry points.
 studio-mcp = "studio_agent.mcp_server:main"
 studio-agent = "studio_agent.agent:main"
 studio-web = "studio_agent.web:main"
+studio-index = "studio_agent.index:main"
 
 [build-system]
 requires = ["hatchling"]

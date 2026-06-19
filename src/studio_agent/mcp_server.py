@@ -23,12 +23,13 @@ mcp = FastMCP("studio-pms")
 
 @mcp.tool()
 def search_projects(query: str, limit: int = 10) -> list[dict[str, Any]]:
-    """Find past projects whose name/description match the query text.
+    """Find past projects most similar to a brief or description.
 
-    Phase-one (lexical) similarity. Returns project_id, name, client, discipline,
-    date, people_count and a relevance score, best matches first. Use this to find
-    projects similar to a brief, then call get_project for the people who worked on
-    the closest matches.
+    Uses semantic (meaning-based) search when the local index is built, otherwise
+    keyword search; the ``match`` field shows which. Returns project_id, name,
+    client, discipline, date, people_count and a relevance score, best first. Use
+    this to find projects similar to a brief, then call get_project for the people
+    who worked on the closest matches.
     """
     return repo.search_projects(query, limit=limit)
 

@@ -137,12 +137,12 @@ def list_people(limit: int = 100) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def search_projects(query_text: str, limit: int = 10) -> list[dict[str, Any]]:
-    """Lexical search over project name + description.
+def lexical_search_projects(query_text: str, limit: int = 10) -> list[dict[str, Any]]:
+    """Keyword search over project name + description.
 
-    Phase-one similarity: scores each project by how many query terms appear in
-    its name (weight 2) and description (weight 1). Semantic/vector search is a
-    later slice.
+    Scores each project by how many query terms appear in its name (weight 2) and
+    description (weight 1). Used directly, or as a fallback when no semantic index
+    is built. See ``search_projects`` for the dispatcher.
     """
     terms = [t for t in query_text.split() if len(t) >= 2][:8]
     if not terms:
@@ -181,7 +181,87 @@ def search_projects(query_text: str, limit: int = 10) -> list[dict[str, Any]]:
     rows = query(sql, params)
     for r in rows:
         r["date"] = _iso(r.pop("date_ts"))
+        r["match"] = "lexical"
     return _deep_clean(rows)
+
+
+def _projects_by_ids(ids: list[int]) -> dict[int, dict[str, Any]]:
+    """Fetch display rows for the given project ids (non-deleted only)."""
+    if not ids:
+        return {}
+    placeholders = ",".join(["%s"] * len(ids))
+    rows = query(
+        f"""SELECT p.project_id,
+                   p.project_name      AS name,
+                   c.client_name       AS client,
+                   {_DISCIPLINE_SQL}   AS discipline,
+                   p.project_date      AS date_ts,
+                   {_PEOPLE_COUNT_SQL} AS people_count
+              FROM project p
+              LEFT JOIN client c ON c.client_id = p.project_client
+             WHERE p.project_deleted = 0 AND p.project_id IN ({placeholders})""",
+        ids,
+    )
+    return {r["project_id"]: r for r in rows}
+
+
+def semantic_search_projects(query_text: str, limit: int = 10) -> list[dict[str, Any]]:
+    """Embedding-based similarity over project text (needs a built index).
+
+    Returns [] if no index is present so the caller can fall back to lexical.
+    """
+    from . import index
+
+    hits = index.search(query_text, limit=limit)
+    if not hits:
+        return []
+    by_id = _projects_by_ids([pid for pid, _ in hits])
+    out: list[dict[str, Any]] = []
+    for pid, score in hits:  # already ordered best-first
+        row = by_id.get(pid)
+        if not row:  # project deleted since the index was built
+            continue
+        row = dict(row)
+        row["date"] = _iso(row.pop("date_ts"))
+        row["score"] = round(score, 4)
+        row["match"] = "semantic"
+        out.append(row)
+    return _deep_clean(out)
+
+
+def search_projects(
+    query_text: str, limit: int = 10, mode: str = "auto"
+) -> list[dict[str, Any]]:
+    """Find projects similar to the query.
+
+    ``mode``: "auto" (semantic if an index is built, else lexical), "semantic",
+    or "lexical". Results carry a ``match`` field indicating which was used.
+    """
+    from . import index
+
+    want_semantic = mode == "semantic" or (mode == "auto" and index.available())
+    if want_semantic:
+        results = semantic_search_projects(query_text, limit)
+        if results or mode == "semantic":
+            return results
+    return lexical_search_projects(query_text, limit)
+
+
+def projects_for_index() -> list[dict[str, Any]]:
+    """Text corpus for the semantic index: id + cleaned name/description."""
+    rows = query(
+        """SELECT project_id, project_name AS name, project_description AS descr
+             FROM project
+            WHERE project_deleted = 0"""
+    )
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        name = _clean_text(r["name"] or "")
+        descr = _clean_text(r["descr"] or "")
+        text = f"{name}. {descr}".strip()
+        if text and text != ".":
+            out.append({"project_id": r["project_id"], "text": text})
+    return out
 
 
 def get_project(project_id: int) -> dict[str, Any] | None:
