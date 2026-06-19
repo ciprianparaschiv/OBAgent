@@ -14,6 +14,8 @@ dependencies = [
     "openai>=1.40.0",
     # Custom MCP server for the in-house PMS.
     "mcp>=1.2.0",
+    # Minimal local web UI for testing in a browser (uvicorn ships with mcp).
+    "fastapi>=0.110",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +28,7 @@ dev = [
 # Convenience entry points.
 studio-mcp = "studio_agent.mcp_server:main"
 studio-agent = "studio_agent.agent:main"
+studio-web = "studio_agent.web:main"
 
 [build-system]
 requires = ["hatchling"]

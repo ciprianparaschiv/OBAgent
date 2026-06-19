@@ -115,8 +115,17 @@ async def connect_tools():
 # --------------------------------------------------------------------------- #
 
 
-async def run(question: str, *, verbose: bool = True) -> str:
-    """Answer a plain-language question using the model + PMS tools."""
+async def run(
+    question: str,
+    *,
+    verbose: bool = True,
+    trace: list[dict[str, Any]] | None = None,
+) -> str:
+    """Answer a plain-language question using the model + PMS tools.
+
+    If ``trace`` is provided, each tool call is appended as
+    ``{"tool": name, "args": {...}}`` (handy for surfacing in a UI).
+    """
     client = make_client()
     model = model_name()
 
@@ -162,6 +171,8 @@ async def run(question: str, *, verbose: bool = True) -> str:
                 args = json.loads(tc.function.arguments or "{}")
                 if verbose:
                     print(f"  → {tc.function.name}({json.dumps(args)})", file=sys.stderr)
+                if trace is not None:
+                    trace.append({"tool": tc.function.name, "args": args})
                 result = await tools.call(tc.function.name, args)
                 messages.append(
                     {"role": "tool", "tool_call_id": tc.id, "content": result}

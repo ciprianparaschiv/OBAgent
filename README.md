@@ -57,6 +57,12 @@ Natural-language version via the model (needs `OPENAI_API_KEY` in `.env`):
 studio-agent "what past projects are most similar to an email newsletter design for a tech brand, and who worked on them?"
 ```
 
+Browser UI (local only — data never leaves this machine):
+
+```bash
+studio-web        # then open http://127.0.0.1:8000
+```
+
 Dev model is set by config only (provider-agnostic). The current default is
 Google Gemini's free tier (`gemini-2.5-flash`, free key from
 https://aistudio.google.com/apikey); swap to Anthropic / Groq / a local Ollama
