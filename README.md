@@ -100,6 +100,24 @@ studio-index                   # build index/ from the snapshot (gitignored, ~53
 The index is built locally and never leaves the machine. Without it, search
 falls back to keyword matching automatically.
 
+## Connecting to the live PMS (read-only)
+
+The default profile is the local snapshot (`.env`); dev and tests never touch
+production. To point at the live cPanel MySQL **read-only** over an SSH tunnel:
+
+1. Create a `SELECT`-only MySQL user in cPanel (no other privileges).
+2. cPanel → SSH Access → generate/import and **authorize** a key.
+3. `cp .env.live.example .env.live` and fill in DB creds + SSH host/user/key.
+4. Open the tunnel (keep it running): `./scripts/db_tunnel.sh`
+5. Run anything against live by selecting the profile:
+   ```bash
+   STUDIO_ENV_FILE=.env.live studio-web
+   STUDIO_ENV_FILE=.env.live studio-agent "…"
+   ```
+
+`.env.live` is gitignored. Read-only is enforced three ways: a `SELECT`-only DB
+user, the connector's statement guard, and `SET SESSION TRANSACTION READ ONLY`.
+
 ## Constraints
 
 - Read-only throughout. Local DB user is granted `SELECT` only.

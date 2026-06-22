@@ -6,9 +6,17 @@ environment (loaded from a local, gitignored ``.env`` during development).
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _env_file() -> str:
+    """Which .env to load. Default is the local snapshot profile; set
+    ``STUDIO_ENV_FILE=.env.live`` to point at the live (read-only) production DB.
+    """
+    return os.getenv("STUDIO_ENV_FILE", ".env")
 
 
 class DBSettings(BaseSettings):
@@ -43,9 +51,9 @@ class LLMSettings(BaseSettings):
 
 @lru_cache
 def db_settings() -> DBSettings:
-    return DBSettings()
+    return DBSettings(_env_file=_env_file())
 
 
 @lru_cache
 def llm_settings() -> LLMSettings:
-    return LLMSettings()
+    return LLMSettings(_env_file=_env_file())

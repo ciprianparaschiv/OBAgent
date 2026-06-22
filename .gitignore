@@ -233,3 +233,8 @@ __marimo__/
 
 # Local Claude Code settings
 .claude/settings.local.json
+
+# Environment profiles with real secrets (live DB, SSH). Keep *.example tracked.
+.env.*
+!.env.example
+!.env.live.example
