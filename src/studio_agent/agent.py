@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import datetime as _dt
 import json
+import os
 import sys
 from contextlib import asynccontextmanager
 from typing import Any
@@ -105,8 +106,13 @@ def _normalise(res: Any) -> Any:
 @asynccontextmanager
 async def connect_tools():
     """Spawn the PMS MCP server over stdio and yield a ready MCPTools."""
+    # Pass our full environment so the subprocess uses the same profile
+    # (STUDIO_ENV_FILE), DB creds, etc. — otherwise stdio defaults to a minimal
+    # env and the MCP server would silently fall back to the snapshot .env.
     params = StdioServerParameters(
-        command=sys.executable, args=["-m", "studio_agent.mcp_server"]
+        command=sys.executable,
+        args=["-m", "studio_agent.mcp_server"],
+        env=dict(os.environ),
     )
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
