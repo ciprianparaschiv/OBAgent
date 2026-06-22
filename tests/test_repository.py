@@ -123,3 +123,27 @@ def test_search_auto_falls_back_to_lexical_without_index(monkeypatch):
     monkeypatch.setattr(index, "available", lambda: False)
     rows = repo.search_projects("landing page", limit=3, mode="auto")
     assert rows and all(r["match"] == "lexical" for r in rows)
+
+
+def test_list_recent_projects_window(monkeypatch):
+    # Pin "now" just past the newest creation date so the window is deterministic.
+    latest = repo.query_one(
+        "SELECT MAX(project_date) AS m FROM project WHERE project_deleted=0"
+    )["m"]
+    monkeypatch.setattr(repo, "_now", lambda: float(latest) + 1)
+    res = repo.list_recent_projects(days=7)
+    assert res["days"] == 7 and res["since"]
+    assert res["projects"], "expected recently-created projects"
+    dates = [p["date"] for p in res["projects"]]
+    assert dates == sorted(dates, reverse=True), "newest first"
+    assert all(p["date"] >= res["since"] for p in res["projects"])
+
+
+def test_list_recent_projects_client_filter(monkeypatch):
+    latest = repo.query_one(
+        "SELECT MAX(project_date) AS m FROM project WHERE project_deleted=0"
+    )["m"]
+    monkeypatch.setattr(repo, "_now", lambda: float(latest) + 1)
+    res = repo.list_recent_projects(days=3650, client="Logitech", limit=10)
+    assert res["projects"], "expected Logitech projects in a 10-year window"
+    assert all("logitech" in (p["client"] or "").lower() for p in res["projects"])

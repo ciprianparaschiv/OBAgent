@@ -264,6 +264,46 @@ def projects_for_index() -> list[dict[str, Any]]:
     return out
 
 
+def list_recent_projects(
+    days: int = 7, client: str | None = None, limit: int = 20
+) -> dict[str, Any]:
+    """Projects created recently (by creation date), newest first.
+
+    ``days`` is the window relative to now (1 = today, 7 = this week, 30 = this
+    month). ``client`` optionally filters by client name (substring). Each result
+    includes ``date`` (created) and ``people_count`` (how many have logged time so
+    far — often 0 for brand-new projects).
+    """
+    cutoff = int(_now() - int(days) * 86400)
+    params: list[Any] = [cutoff]
+    client_clause = ""
+    if client:
+        client_clause = "AND c.client_name LIKE %s"
+        params.append(f"%{client}%")
+    params.append(int(limit))
+
+    rows = query(
+        f"""SELECT p.project_id,
+                   p.project_name      AS name,
+                   c.client_name       AS client,
+                   {_DISCIPLINE_SQL}   AS discipline,
+                   p.project_date      AS date_ts,
+                   {_PEOPLE_COUNT_SQL} AS people_count
+              FROM project p
+              LEFT JOIN client c ON c.client_id = p.project_client
+             WHERE p.project_deleted = 0 AND p.project_date >= %s
+                   {client_clause}
+             ORDER BY p.project_date DESC
+             LIMIT %s""",
+        params,
+    )
+    for r in rows:
+        r["date"] = _iso(r.pop("date_ts"))
+    return _deep_clean(
+        {"days": int(days), "since": _iso(cutoff), "client": client, "projects": rows}
+    )
+
+
 def get_project(project_id: int) -> dict[str, Any] | None:
     """Full details for one project, including everyone who logged time on it."""
     p = query_one(

@@ -47,6 +47,11 @@ month"), call list_person_projects with since_days (7 = last week, 30 = last \
 month); it returns only projects worked in that window, ordered by most recent \
 activity, with a last_worked date. State the window you used.
 
+For "what projects were created today / this week / this month" or "what's new \
+for client X", call list_recent_projects with days (today = 1, week = 7, month = \
+30) and an optional client filter. These are projects by creation date (newest \
+first); people_count is how many have logged time so far (often 0 if brand new).
+
 If a person's name is ambiguous, the tool returns candidates — pick the most \
 likely or ask which one. Keep answers concise and grounded in the data."""
 

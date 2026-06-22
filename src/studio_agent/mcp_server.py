@@ -35,6 +35,20 @@ def search_projects(query: str, limit: int = 10) -> list[dict[str, Any]]:
 
 
 @mcp.tool()
+def list_recent_projects(
+    days: int = 7, client: str | None = None, limit: int = 20
+) -> dict[str, Any]:
+    """List projects created recently (by creation date), newest first.
+
+    Use for "what was created today / this week / this month" and "what's new for
+    client X". Map the question to ``days`` (today = 1, this week = 7, this month
+    = 30). ``client`` optionally filters by client name. Returns project_id, name,
+    client, discipline, date (created) and people_count (who's logged time so far).
+    """
+    return repo.list_recent_projects(days=days, client=client, limit=limit)
+
+
+@mcp.tool()
 def get_project(project_id: int) -> dict[str, Any] | None:
     """Full details for one project, including the client, discipline, the lead,
     and everyone who logged time on it (with hours). Returns null if not found."""
