@@ -28,9 +28,31 @@
   #trace { font-size: .8rem; color: #888; margin-top: .6rem; word-break: break-all; }
   .note { font-size: .75rem; color: #999; border-top: 1px solid #8883; margin-top: 2rem; padding-top: .6rem; }
   code { background:#8882; padding:.05rem .3rem; border-radius:4px; }
+  .overlay { position: fixed; inset: 0; background: rgba(20,22,28,.96); display: flex;
+             align-items: center; justify-content: center; z-index: 50; }
+  .login { width: min(92vw, 340px); background: #1c1f26; border: 1px solid #8883;
+           border-radius: 12px; padding: 1.4rem; color: #eee; }
+  .login h2 { font-size: 1.05rem; margin: 0 0 .3rem; }
+  .login p { font-size: .8rem; color: #aaa; margin: 0 0 1rem; }
+  .login input { width: 100%; box-sizing: border-box; padding: .6rem; margin: .3rem 0;
+                 border-radius: 8px; border: 1px solid #8884; background: #0d0f13; color: #eee; font: inherit; }
+  .login button { width: 100%; margin-top: .7rem; }
+  #lerr { color: #e66; font-size: .8rem; min-height: 1rem; margin-top: .4rem; }
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
+<div id="overlay" class="overlay hidden">
+  <form class="login" onsubmit="doLogin(event)">
+    <h2>Studio Staffing Agent</h2>
+    <p>Please sign in.</p>
+    <input id="lu" placeholder="Username" autocomplete="username" autofocus>
+    <input id="lp" type="password" placeholder="Password" autocomplete="current-password">
+    <button type="submit">Sign in</button>
+    <div id="lerr"></div>
+  </form>
+</div>
+
 <h1>Studio Staffing Agent</h1>
 <p class="sub">read-only · the database stays on your machine · model: <span id="model">…</span></p>
 
@@ -69,17 +91,37 @@ A human makes every staffing decision.</p>
 
   function setq(a){ document.getElementById('q').value = a.textContent; }
 
+  // --- auth ---
+  function authHeaders(){
+    const t = sessionStorage.getItem('ob_auth');
+    return t ? {'Authorization': 'Basic ' + t} : {};
+  }
+  function showLogin(){ document.getElementById('overlay').classList.remove('hidden'); }
+  function hideLogin(){ document.getElementById('overlay').classList.add('hidden'); }
+  async function doLogin(ev){
+    ev.preventDefault();
+    const u = document.getElementById('lu').value, p = document.getElementById('lp').value;
+    sessionStorage.setItem('ob_auth', btoa(u + ':' + p));
+    const ok = await checkConn();
+    if(!ok) document.getElementById('lerr').textContent =
+      'Wrong username/password, or the local backend isn’t running.';
+  }
+
+  // Returns true if connected & authorised, false otherwise.
   async function checkConn(){
     const dot = document.getElementById('dot'), st = document.getElementById('status');
     try {
-      const r = await fetch(api() + '/config', {cache:'no-store'});
+      const r = await fetch(api() + '/config', {cache:'no-store', headers: authHeaders()});
+      if(r.status === 401){ dot.classList.remove('ok'); st.textContent = 'sign in required'; showLogin(); return false; }
       const d = await r.json();
       document.getElementById('model').textContent = d.model || 'unknown';
       dot.classList.add('ok'); st.textContent = 'connected';
+      hideLogin(); return true;
     } catch(e) {
       dot.classList.remove('ok');
       st.textContent = 'not reachable — run `studio-web` locally';
       document.getElementById('model').textContent = '—';
+      return false;
     }
   }
 
@@ -89,7 +131,10 @@ A human makes every staffing decision.</p>
     const btn = document.getElementById('go'), ans = document.getElementById('answer'), tr = document.getElementById('trace');
     btn.disabled = true; ans.textContent = ''; tr.textContent = 'thinking…';
     try {
-      const r = await fetch(api() + '/ask', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({question:q})});
+      const r = await fetch(api() + '/ask', {method:'POST',
+        headers: Object.assign({'Content-Type':'application/json'}, authHeaders()),
+        body: JSON.stringify({question:q})});
+      if(r.status === 401){ ans.textContent=''; tr.textContent=''; showLogin(); btn.disabled=false; return; }
       const d = await r.json();
       if(d.error){ ans.textContent = 'Error: ' + d.error; tr.textContent=''; }
       else {
@@ -108,7 +153,8 @@ A human makes every staffing decision.</p>
   document.getElementById('q').addEventListener('keydown', e => {
     if((e.metaKey||e.ctrlKey) && e.key === 'Enter') ask();
   });
-  checkConn();
+  // Require sign-in before doing anything.
+  if(sessionStorage.getItem('ob_auth')) checkConn(); else showLogin();
 </script>
 </body>
 </html>

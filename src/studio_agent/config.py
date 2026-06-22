@@ -49,6 +49,21 @@ class LLMSettings(BaseSettings):
     model: str = "gemini-2.5-flash"
 
 
+class WebAuthSettings(BaseSettings):
+    """Optional HTTP Basic Auth for the local web UI/API. Empty = no auth."""
+
+    model_config = SettingsConfigDict(env_prefix="WEB_AUTH_", env_file=".env", extra="ignore")
+
+    user: str = ""
+    password: str = ""
+
+
+@lru_cache
+def web_auth() -> tuple[str, str] | None:
+    s = WebAuthSettings(_env_file=_env_file())
+    return (s.user, s.password) if s.user and s.password else None
+
+
 @lru_cache
 def db_settings() -> DBSettings:
     return DBSettings(_env_file=_env_file())
