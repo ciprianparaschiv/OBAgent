@@ -46,6 +46,8 @@
   button.small { margin: 0; padding: .3rem .7rem; font-size: .8rem; }
   .brief { border: 1px solid #8883; border-radius: 8px; padding: .55rem .8rem; margin: .5rem 0; }
   .brief .t { font-weight: 600; }
+  .brief .t a { color: #2d6cdf; text-decoration: none; }
+  .brief .t a:hover { text-decoration: underline; }
   .brief .m { font-size: .8rem; color: #888; margin: .1rem 0; }
   .brief .s { font-size: .85rem; margin-top: .25rem; }
 </style>
@@ -183,7 +185,10 @@ A human makes every staffing decision.</p>
         const b = item.brief;
         const sugg = (item.suggestions || []).map(s => s.name).join(', ') || '—';
         const meta = [b.client, b.priority, b.status].filter(Boolean).join(' · ');
-        return '<div class="brief"><div class="t">' + esc(b.title) + '</div>'
+        const titleHtml = b.url
+          ? '<a href="' + esc(b.url) + '" target="_blank" rel="noopener">' + esc(b.title) + '</a>'
+          : esc(b.title);
+        return '<div class="brief"><div class="t">' + titleHtml + '</div>'
           + '<div class="m">' + esc(meta) + (b.created ? ' · ' + b.created : '') + '</div>'
           + '<div class="s"><b>Suggested:</b> ' + esc(sugg) + '</div></div>';
       }).join('') || '<p class="muted">No incoming briefs yet.</p>';
