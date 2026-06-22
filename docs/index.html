@@ -39,6 +39,15 @@
   .login button { width: 100%; margin-top: .7rem; }
   #lerr { color: #e66; font-size: .8rem; min-height: 1rem; margin-top: .4rem; }
   .hidden { display: none !important; }
+  #triage-section { margin-top: 1.8rem; }
+  .triage-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+  .triage-head h2 { font-size: 1.05rem; margin: 0; }
+  .muted { font-weight: 400; color: #888; font-size: .8rem; }
+  button.small { margin: 0; padding: .3rem .7rem; font-size: .8rem; }
+  .brief { border: 1px solid #8883; border-radius: 8px; padding: .55rem .8rem; margin: .5rem 0; }
+  .brief .t { font-weight: 600; }
+  .brief .m { font-size: .8rem; color: #888; margin: .1rem 0; }
+  .brief .s { font-size: .85rem; margin-top: .25rem; }
 </style>
 </head>
 <body>
@@ -73,6 +82,15 @@
 
 <div id="trace"></div>
 <div id="answer"></div>
+
+<section id="triage-section">
+  <div class="triage-head">
+    <h2>Incoming briefs <span class="muted">— auto-triaged from Notion</span></h2>
+    <button id="refresh-triage" class="small" onclick="refreshTriage()">Refresh</button>
+    <span id="triage-status" class="muted"></span>
+  </div>
+  <div id="triage-list"></div>
+</section>
 
 <p class="note">This page is just a UI. It talks to a backend you run locally
 (<code>studio-web</code>), which reads the local PMS snapshot. No project data leaves your machine.
@@ -116,7 +134,7 @@ A human makes every staffing decision.</p>
       const d = await r.json();
       document.getElementById('model').textContent = d.model || 'unknown';
       dot.classList.add('ok'); st.textContent = 'connected';
-      hideLogin(); return true;
+      hideLogin(); loadTriage(); return true;
     } catch(e) {
       dot.classList.remove('ok');
       st.textContent = 'not reachable — run `studio-web` locally';
@@ -148,6 +166,34 @@ A human makes every staffing decision.</p>
       tr.textContent='';
     }
     btn.disabled = false;
+  }
+
+  // --- incoming briefs (auto-triage) ---
+  function esc(s){ return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  async function loadTriage(){
+    const list = document.getElementById('triage-list'), st = document.getElementById('triage-status');
+    try {
+      const r = await fetch(api() + '/incoming', {headers: authHeaders(), cache:'no-store'});
+      if(r.status === 401){ showLogin(); return; }
+      const d = await r.json();
+      if(!d.watching){ st.textContent = 'watcher off (Notion not configured on this backend)'; list.innerHTML = ''; return; }
+      st.textContent = (d.last_run ? 'updated ' + d.last_run : 'starting…') + ' · ' + d.count + ' briefs'
+        + (d.error ? ' · error: ' + d.error : '');
+      list.innerHTML = (d.briefs || []).map(item => {
+        const b = item.brief;
+        const sugg = (item.suggestions || []).map(s => s.name).join(', ') || '—';
+        const meta = [b.client, b.priority, b.status].filter(Boolean).join(' · ');
+        return '<div class="brief"><div class="t">' + esc(b.title) + '</div>'
+          + '<div class="m">' + esc(meta) + (b.created ? ' · ' + b.created : '') + '</div>'
+          + '<div class="s"><b>Suggested:</b> ' + esc(sugg) + '</div></div>';
+      }).join('') || '<p class="muted">No incoming briefs yet.</p>';
+    } catch(e){ st.textContent = 'not reachable'; }
+  }
+  async function refreshTriage(){
+    const btn = document.getElementById('refresh-triage');
+    btn.disabled = true; document.getElementById('triage-status').textContent = 'refreshing…';
+    try { await fetch(api() + '/incoming/refresh', {method:'POST', headers: authHeaders()}); } catch(e){}
+    await loadTriage(); btn.disabled = false;
   }
 
   document.getElementById('q').addEventListener('keydown', e => {
