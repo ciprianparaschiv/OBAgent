@@ -423,3 +423,125 @@ def list_person_projects(
         result["window_days"] = int(since_days)
         result["since"] = _iso(cutoff)
     return _deep_clean(result)
+
+
+# ---------------------------------------------------------------------------
+# staffing recommendation
+# ---------------------------------------------------------------------------
+
+
+def _recency_factor(last_ts: int, now: float) -> float:
+    """Weight recent experience higher (and treat very stale work as less relevant)."""
+    if not last_ts:
+        return 0.45
+    days = (now - last_ts) / 86400.0
+    if days <= 120:
+        return 1.0
+    if days <= 365:
+        return 0.7
+    return 0.45
+
+
+def recommend_staffing(
+    brief: str, similar_limit: int = 20, top_k: int = 5
+) -> dict[str, Any]:
+    """Suggest who to staff on an incoming brief, from PMS experience only.
+
+    Finds projects similar to the brief, then ranks the (currently active) people
+    who logged time on them by relevant experience: hours weighted by project
+    similarity and recency, with a bonus for having led similar work. Returns a
+    shortlist with evidence. Does NOT consider availability/leave — a human
+    decides; that signal needs the leave planner (a separate source).
+    """
+    similar = search_projects(brief, limit=similar_limit)
+    if not similar:
+        return {
+            "brief": brief,
+            "similar_projects_considered": 0,
+            "candidates": [],
+            "note": "No similar past projects found to base a recommendation on.",
+        }
+
+    meta = {s["project_id"]: s for s in similar}
+    ids = list(meta.keys())
+    max_score = max((s.get("score") or 0) for s in similar) or 1.0
+    placeholders = ",".join(["%s"] * len(ids))
+
+    rows = query(
+        f"""SELECT t.timing_project AS pid, u.user_id AS user_id,
+                   u.user_name AS name, ut.usertype_name AS role,
+                   SUM(GREATEST(t.timing_end - t.timing_start, 0)) AS seconds,
+                   MAX(t.timing_end) AS last_ts
+              FROM timing t
+              JOIN user u ON u.user_id = t.timing_user
+              LEFT JOIN usertype ut ON ut.usertype_id = u.user_type
+             WHERE t.timing_project IN ({placeholders})
+               AND u.user_active = 1 AND u.user_deleted = 0
+             GROUP BY t.timing_project, u.user_id, u.user_name, ut.usertype_name""",
+        ids,
+    )
+    leads = {
+        r["project_id"]: r["project_users_responsable"]
+        for r in query(
+            f"SELECT project_id, project_users_responsable FROM project "
+            f"WHERE project_id IN ({placeholders})",
+            ids,
+        )
+    }
+
+    now = _now()
+    agg: dict[int, dict[str, Any]] = {}
+    for r in rows:
+        pid, uid = r["pid"], r["user_id"]
+        sim = (meta[pid].get("score") or 0) / max_score
+        hours = _hours(r["seconds"])
+        led = leads.get(pid) == uid
+        a = agg.setdefault(
+            uid,
+            {
+                "user_id": uid, "name": r["name"], "role": r["role"],
+                "relevant_hours": 0.0, "weighted_hours": 0.0,
+                "matched_projects": 0, "led_count": 0, "last_ts": 0, "_ev": [],
+            },
+        )
+        a["relevant_hours"] += hours
+        a["weighted_hours"] += sim * hours
+        a["matched_projects"] += 1
+        a["led_count"] += 1 if led else 0
+        a["last_ts"] = max(a["last_ts"], r["last_ts"] or 0)
+        a["_ev"].append(
+            {
+                "project_id": pid, "name": meta[pid]["name"],
+                "client": meta[pid].get("client"), "hours": hours,
+                "similarity": round(sim, 3), "date": meta[pid].get("date"), "led": led,
+            }
+        )
+
+    candidates: list[dict[str, Any]] = []
+    for a in agg.values():
+        rec = _recency_factor(a["last_ts"], now)
+        lead_bonus = 1.0 + 0.15 * min(a["led_count"], 3)
+        a["last_worked"] = _iso(a.pop("last_ts"))
+        a["recency_factor"] = round(rec, 2)
+        a["relevant_hours"] = round(a["relevant_hours"], 1)
+        a["weighted_hours"] = round(a["weighted_hours"], 2)
+        a["score"] = round(a["weighted_hours"] * rec * lead_bonus, 2)
+        a["evidence"] = sorted(
+            a.pop("_ev"), key=lambda e: e["similarity"] * e["hours"], reverse=True
+        )[:3]
+        candidates.append(a)
+
+    candidates.sort(key=lambda c: c["score"], reverse=True)
+    return _deep_clean(
+        {
+            "brief": brief,
+            "similar_projects_considered": len(ids),
+            "candidates": candidates[:top_k],
+            "note": (
+                "Ranked by relevant past experience only: hours on similar "
+                "projects, weighted by similarity and recency, with a bonus for "
+                "leading. Does NOT account for current availability or leave — "
+                "a human makes the final call."
+            ),
+        }
+    )

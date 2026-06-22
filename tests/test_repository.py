@@ -147,3 +147,32 @@ def test_list_recent_projects_client_filter(monkeypatch):
     res = repo.list_recent_projects(days=3650, client="Logitech", limit=10)
     assert res["projects"], "expected Logitech projects in a 10-year window"
     assert all("logitech" in (p["client"] or "").lower() for p in res["projects"])
+
+
+def test_recommend_staffing_ranks_with_evidence():
+    res = repo.recommend_staffing("email marketing newsletter design", top_k=5)
+    cands = res["candidates"]
+    assert cands, "expected staffing candidates"
+    assert res["similar_projects_considered"] > 0
+    assert "availability" in res["note"].lower()
+    # Ranked by score descending.
+    scores = [c["score"] for c in cands]
+    assert scores == sorted(scores, reverse=True)
+    # Each candidate has evidence and the expected fields.
+    for c in cands:
+        assert c["evidence"], "each candidate should cite similar projects"
+        assert {"user_id", "name", "relevant_hours", "matched_projects", "last_worked"} <= c.keys()
+        assert c["relevant_hours"] >= 0
+
+
+def test_recommend_staffing_only_active_people():
+    res = repo.recommend_staffing("landing page development", top_k=10)
+    ids = [c["user_id"] for c in res["candidates"]]
+    if ids:
+        placeholders = ",".join(["%s"] * len(ids))
+        rows = repo.query(
+            f"SELECT user_id FROM user WHERE user_id IN ({placeholders}) "
+            f"AND user_active=1 AND user_deleted=0",
+            ids,
+        )
+        assert {r["user_id"] for r in rows} == set(ids), "only active, non-deleted users"

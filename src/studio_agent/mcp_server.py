@@ -35,6 +35,20 @@ def search_projects(query: str, limit: int = 10) -> list[dict[str, Any]]:
 
 
 @mcp.tool()
+def recommend_staffing(brief: str, top_k: int = 5) -> dict[str, Any]:
+    """Suggest who to staff on an incoming project brief, from PMS experience.
+
+    Finds similar past projects and ranks currently-active people by relevant
+    experience (hours on similar work, weighted by similarity and recency, plus a
+    lead bonus). Returns a shortlist, each with evidence (the similar projects they
+    worked on, hours, similarity). IMPORTANT: this reflects experience only — it
+    does NOT know who is available or on leave; always present it as advice for a
+    human to decide, and say availability wasn't considered.
+    """
+    return repo.recommend_staffing(brief, top_k=top_k)
+
+
+@mcp.tool()
 def list_recent_projects(
     days: int = 7, client: str | None = None, limit: int = 20
 ) -> dict[str, Any]:
