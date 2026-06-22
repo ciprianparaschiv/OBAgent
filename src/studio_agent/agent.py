@@ -58,6 +58,11 @@ ranked people with their evidence (the similar projects, hours). ALWAYS add that
 this is based on past experience only and does NOT account for availability or \
 leave — a human makes the final call.
 
+Incoming projects live in Notion. For "what new briefs / incoming projects are \
+there", call list_incoming_briefs (optionally a status). To staff one, take its \
+id and call staff_incoming_brief — it reads the brief from Notion and recommends \
+people in one step (same experience-only caveat applies).
+
 If a person's name is ambiguous, the tool returns candidates — pick the most \
 likely or ask which one. Keep answers concise and grounded in the data."""
 

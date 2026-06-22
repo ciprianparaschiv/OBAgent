@@ -176,3 +176,27 @@ def test_recommend_staffing_only_active_people():
             ids,
         )
         assert {r["user_id"] for r in rows} == set(ids), "only active, non-deleted users"
+
+
+# --- Notion incoming briefs (skipped unless NOTION_TOKEN is configured) -----
+
+from studio_agent import notion  # noqa: E402
+
+needs_notion = pytest.mark.skipif(not notion.available(), reason="NOTION_TOKEN not set")
+
+
+@needs_notion
+def test_list_incoming_briefs_shape():
+    briefs = notion.list_incoming_briefs(limit=5)
+    assert isinstance(briefs, list)
+    for b in briefs:
+        assert {"id", "title", "status", "url"} <= b.keys()
+
+
+@needs_notion
+def test_get_brief_assembles_text():
+    briefs = notion.list_incoming_briefs(limit=1)
+    if not briefs:
+        pytest.skip("no briefs available")
+    d = notion.get_brief(briefs[0]["id"])
+    assert d and "brief_text" in d and d["title"]

@@ -16,7 +16,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from . import repository as repo
+from . import notion, repository as repo
 
 mcp = FastMCP("studio-pms")
 
@@ -85,6 +85,34 @@ def list_person_projects(
     Each project includes ``last_worked`` (date of their most recent time entry).
     """
     return repo.list_person_projects(person, limit=limit, since_days=since_days)
+
+
+@mcp.tool()
+def list_incoming_briefs(limit: int = 15, status: str | None = None) -> list[dict[str, Any]]:
+    """List incoming project briefs from Notion (the team's task/briefing boards).
+
+    Newest first. Each brief has id, title, status, priority, client, assignee,
+    created date and url. Optional ``status`` filters by the Notion status (e.g.
+    "To Do", "Assigned to Designer"). Use a brief's id with staff_incoming_brief
+    to get a staffing recommendation. Read-only.
+    """
+    return notion.list_incoming_briefs(limit=limit, status=status)
+
+
+@mcp.tool()
+def staff_incoming_brief(brief_id: str, top_k: int = 5) -> dict[str, Any]:
+    """Recommend who to staff on a specific incoming Notion brief.
+
+    Fetches the brief text from Notion (by id, from list_incoming_briefs) and runs
+    the staffing recommendation against PMS history. Returns the brief plus the
+    ranked people with evidence. Like recommend_staffing, this is experience-based
+    only and does NOT consider availability/leave — a human decides.
+    """
+    brief = notion.get_brief(brief_id)
+    if not brief:
+        return {"brief": None, "error": "Brief not found or Notion is not configured."}
+    recommendation = repo.recommend_staffing(brief.get("brief_text") or brief["title"], top_k=top_k)
+    return {"brief": brief, "recommendation": recommendation}
 
 
 def main() -> None:

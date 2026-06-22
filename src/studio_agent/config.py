@@ -49,6 +49,25 @@ class LLMSettings(BaseSettings):
     model: str = "gemini-2.5-flash"
 
 
+class NotionSettings(BaseSettings):
+    """Read-only Notion access (incoming briefs). Empty token = Notion disabled."""
+
+    model_config = SettingsConfigDict(env_prefix="NOTION_", env_file=".env", extra="ignore")
+
+    token: str = ""
+    # Comma-separated Notion database ids holding incoming briefs. Defaults to the
+    # RO Design / Development task boards under the team's Notion homebase.
+    briefs_dbs: str = (
+        "14b35e67-7f07-802e-b271-e98a8240e65e,"
+        "14b35e67-7f07-8051-83c6-db499173f309"
+    )
+
+
+@lru_cache
+def notion_settings() -> NotionSettings:
+    return NotionSettings(_env_file=_env_file())
+
+
 class WebAuthSettings(BaseSettings):
     """Optional HTTP Basic Auth for the local web UI/API. Empty = no auth."""
 
