@@ -21,4 +21,6 @@ LOCAL_PORT="${TUNNEL_LOCAL_PORT:-3307}"
 echo "Tunnel: localhost:${LOCAL_PORT} -> ${SSH_HOST} (mysql 3306) as ${SSH_USER}"
 echo "Leave this running; Ctrl-C to close."
 exec ssh -N -p "${SSH_PORT:-22}" ${SSH_KEY:+-i "${SSH_KEY/#\~/$HOME}"} \
+  -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 \
+  -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \
   -L "${LOCAL_PORT}:127.0.0.1:3306" "${SSH_USER}@${SSH_HOST}"
