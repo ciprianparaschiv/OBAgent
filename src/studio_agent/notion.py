@@ -95,14 +95,20 @@ def _title(props: dict[str, Any]) -> str:
 
 def _summary(row: dict[str, Any]) -> dict[str, Any]:
     p = row.get("properties", {})
+    status = _plain(p["Status"]) if "Status" in p else None
+    assignee = _plain(p["Assignee"]) if "Assignee" in p else None
     return {
         "id": row.get("id"),
         "title": _title(p) or "(untitled)",
-        "status": _plain(p["Status"]) if "Status" in p else None,
+        "status": status,
         "priority": _plain(p["Priority"]) if "Priority" in p else None,
         "client": _plain(p[_CLIENT_FIELD]) if _CLIENT_FIELD in p else None,
-        "assignee": _plain(p["Assignee"]) if "Assignee" in p else None,
+        "assignee": assignee or None,
         "created": (row.get("created_time") or "")[:10] or None,
+        "last_edited": (row.get("last_edited_time") or "")[:16] or None,
+        # A brief that already has an assignee but is back in "To Do" is a
+        # returning/revision (new briefs from the form have no assignee yet).
+        "returning": bool(assignee) and status == "To Do",
         "url": row.get("url"),
     }
 
@@ -115,7 +121,9 @@ def list_incoming_briefs(limit: int = 15, status: str | None = None) -> list[dic
     for db in _dbs():
         payload: dict[str, Any] = {
             "page_size": min(max(limit, 1), 50),
-            "sorts": [{"timestamp": "created_time", "direction": "descending"}],
+            # Sort by last edited so returning tasks (status flipped back to "To
+            # Do", which edits the card) resurface alongside brand-new briefs.
+            "sorts": [{"timestamp": "last_edited_time", "direction": "descending"}],
         }
         if status:
             payload["filter"] = {"property": "Status", "status": {"equals": status}}

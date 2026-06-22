@@ -56,8 +56,12 @@ async def _poll_once(top_k: int = 3) -> None:
     for b in briefs:
         current.add(b["id"])
         cached = _triage.get(b["id"])
-        if cached and cached["brief"].get("status") == b.get("status"):
-            continue  # already triaged and status unchanged
+        if (
+            cached
+            and cached["brief"].get("status") == b.get("status")
+            and cached["brief"].get("last_edited") == b.get("last_edited")
+        ):
+            continue  # already triaged; status and last-edited both unchanged
         full = await asyncio.to_thread(notion.get_brief, b["id"])
         text = (full or {}).get("brief_text") or b["title"]
         rec = await asyncio.to_thread(repo.recommend_staffing, text, 20, top_k)

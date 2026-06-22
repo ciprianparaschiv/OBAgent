@@ -50,6 +50,9 @@
   .brief .t a:hover { text-decoration: underline; }
   .brief .m { font-size: .8rem; color: #888; margin: .1rem 0; }
   .brief .s { font-size: .85rem; margin-top: .25rem; }
+  .brief .cont { color: #b26a00; }
+  .badge { font-size: .7rem; background: #b26a0022; color: #b26a00; border: 1px solid #b26a0055;
+           border-radius: 6px; padding: .05rem .35rem; vertical-align: middle; }
 </style>
 </head>
 <body>
@@ -188,8 +191,16 @@ A human makes every staffing decision.</p>
         const titleHtml = b.url
           ? '<a href="' + esc(b.url) + '" target="_blank" rel="noopener">' + esc(b.title) + '</a>'
           : esc(b.title);
-        return '<div class="brief"><div class="t">' + titleHtml + '</div>'
-          + '<div class="m">' + esc(meta) + (b.created ? ' · ' + b.created : '') + '</div>'
+        const badge = b.returning ? '<span class="badge">↩ returning</span> ' : '';
+        const asg = b.assignee ? ' · assignee ' + esc(b.assignee) : '';
+        const cont = (b.returning && b.assignee)
+          ? '<div class="s cont"><b>Continuity:</b> ' + esc(b.assignee)
+            + ' worked on this before — usually the fastest pick. '
+            + '(The new request may have arrived by email, not shown here.)</div>'
+          : '';
+        return '<div class="brief"><div class="t">' + badge + titleHtml + '</div>'
+          + '<div class="m">' + esc(meta) + asg + (b.created ? ' · ' + b.created : '') + '</div>'
+          + cont
           + '<div class="s"><b>Suggested:</b> ' + esc(sugg) + '</div></div>';
       }).join('') || '<p class="muted">No incoming briefs yet.</p>';
     } catch(e){ st.textContent = 'not reachable'; }
