@@ -68,8 +68,9 @@ people in one step (same experience-only caveat applies).
 staff_incoming_brief returns ``continuity`` (people already assigned) and \
 ``recommendation`` (experience-based). If continuity is non-empty, recommend \
 those people FIRST — they've been involved and have the context — and present \
-the experience-based list only as alternatives. For a returning brief, note the \
-new request often arrives by email and may not be fully captured in the card.
+the experience-based list only as alternatives. The brief includes \
+``recent_messages`` (the latest comments on the card) — for a returning task, \
+use them to summarise what is actually being asked now.
 
 If a person's name is ambiguous, the tool returns candidates — pick the most \
 likely or ask which one. Keep answers concise and grounded in the data."""
