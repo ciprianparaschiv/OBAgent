@@ -141,7 +141,7 @@ A human makes every staffing decision.</p>
       const d = await r.json();
       document.getElementById('model').textContent = d.model || 'unknown';
       dot.classList.add('ok'); st.textContent = 'connected';
-      hideLogin(); loadTriage(); return true;
+      hideLogin(); loadTriage(); startTriagePolling(); return true;
     } catch(e) {
       dot.classList.remove('ok');
       st.textContent = 'not reachable — run `studio-web` locally';
@@ -176,6 +176,10 @@ A human makes every staffing decision.</p>
   }
 
   // --- incoming briefs (auto-triage) ---
+  function startTriagePolling(){
+    if(window._triageTimer) return;
+    window._triageTimer = setInterval(loadTriage, 30000);  // keep the panel current
+  }
   function esc(s){ return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
   async function loadTriage(){
     const list = document.getElementById('triage-list'), st = document.getElementById('triage-status');
@@ -185,7 +189,14 @@ A human makes every staffing decision.</p>
       const d = await r.json();
       if(!d.watching){ st.textContent = 'watcher off (Notion not configured on this backend)'; list.innerHTML = ''; return; }
       const q = d.ai_quota || {};
-      st.textContent = (d.last_run ? 'updated ' + d.last_run : 'starting…') + ' · ' + d.count + ' briefs'
+      // First scan can take ~a minute; keep checking until it completes.
+      if(!d.last_run){
+        st.textContent = 'scanning Notion… (first scan can take up to a minute)';
+        list.innerHTML = '';
+        clearTimeout(window._triageSoon); window._triageSoon = setTimeout(loadTriage, 5000);
+        return;
+      }
+      st.textContent = 'updated ' + d.last_run + ' · ' + d.count + ' briefs'
         + (d.error ? ' · error: ' + d.error : '');
       const banner = (q.exceeded && q.message) ? '<div class="qbanner">⚠ ' + esc(q.message) + '</div>' : '';
       list.innerHTML = banner + (d.briefs || []).map(item => {
