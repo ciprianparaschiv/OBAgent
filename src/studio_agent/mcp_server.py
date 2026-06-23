@@ -109,20 +109,25 @@ def list_incoming_briefs(limit: int = 15, status: str | None = None) -> list[dic
 def staff_incoming_brief(brief_id: str, top_k: int = 5) -> dict[str, Any]:
     """Recommend who to staff on a specific incoming Notion brief.
 
-    Fetches the brief text from Notion (by id, from list_incoming_briefs) and runs
-    the staffing recommendation against PMS history. Returns the brief plus the
-    ranked people with evidence. Like recommend_staffing, this is experience-based
-    only and does NOT consider availability/leave — a human decides.
+    Fetches the brief from Notion (by id, from list_incoming_briefs) and runs the
+    staffing recommendation against PMS history. Returns: ``continuity`` (people
+    already assigned — if any, recommend THEM first, since they have the context),
+    and ``recommendation`` (the experience-based shortlist as alternatives).
+    Experience-based only; does NOT consider availability/leave — a human decides.
     """
     brief = notion.get_brief(brief_id)
     if not brief:
         return {"brief": None, "error": "Brief not found or Notion is not configured."}
+    # If someone is already assigned, that's the continuity pick (they have the
+    # context); the experience-based ranking is the set of alternatives.
+    assignee = brief.get("assignee")
+    continuity = [a.strip() for a in assignee.split(",")] if assignee else []
     recommendation = repo.recommend_staffing(
         brief.get("brief_text") or brief["title"],
         top_k=top_k,
         discipline=brief.get("discipline"),
     )
-    return {"brief": brief, "recommendation": recommendation}
+    return {"brief": brief, "continuity": continuity, "recommendation": recommendation}
 
 
 def main() -> None:

@@ -186,22 +186,25 @@ A human makes every staffing decision.</p>
         + (d.error ? ' · error: ' + d.error : '');
       list.innerHTML = (d.briefs || []).map(item => {
         const b = item.brief;
-        const sugg = (item.suggestions || []).map(s => s.name).join(', ') || '—';
+        const exp = (item.suggestions || []).map(s => s.name).join(', ') || '—';
         const meta = [b.client, b.discipline, b.priority, b.status].filter(Boolean).join(' · ');
         const titleHtml = b.url
           ? '<a href="' + esc(b.url) + '" target="_blank" rel="noopener">' + esc(b.title) + '</a>'
           : esc(b.title);
         const badge = b.returning ? '<span class="badge">↩ returning</span> ' : '';
-        const asg = b.assignee ? ' · assignee ' + esc(b.assignee) : '';
-        const cont = (b.returning && b.assignee)
-          ? '<div class="s cont"><b>Continuity:</b> ' + esc(b.assignee)
-            + ' worked on this before — usually the fastest pick. '
-            + '(The new request may have arrived by email, not shown here.)</div>'
-          : '';
+        let body;
+        if (b.assignee) {
+          // Someone is already involved → recommend continuity first.
+          const note = b.returning ? ' (came back — the new request may be in email)' : '';
+          body = '<div class="s cont"><b>Continuity:</b> ' + esc(b.assignee)
+               + ' — already involved, recommended to continue' + note + '</div>'
+               + '<div class="s muted"><b>Other relevant experience:</b> ' + esc(exp) + '</div>';
+        } else {
+          body = '<div class="s"><b>Suggested:</b> ' + esc(exp) + '</div>';
+        }
         return '<div class="brief"><div class="t">' + badge + titleHtml + '</div>'
-          + '<div class="m">' + esc(meta) + asg + (b.created ? ' · ' + b.created : '') + '</div>'
-          + cont
-          + '<div class="s"><b>Suggested:</b> ' + esc(sugg) + '</div></div>';
+          + '<div class="m">' + esc(meta) + (b.created ? ' · ' + b.created : '') + '</div>'
+          + body + '</div>';
       }).join('') || '<p class="muted">No incoming briefs yet.</p>';
     } catch(e){ st.textContent = 'not reachable'; }
   }

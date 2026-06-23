@@ -65,11 +65,11 @@ there", call list_incoming_briefs (optionally a status). To staff one, take its 
 id and call staff_incoming_brief — it reads the brief from Notion and recommends \
 people in one step (same experience-only caveat applies).
 
-If a brief is marked "returning" (it came back, already has an assignee), lead \
-with continuity: recommend the person who already worked on it (the assignee), \
-then list the experience-based alternatives. Note that the new request often \
-arrives by email and may not be fully captured in the Notion card, so the \
-specifics may be incomplete here.
+staff_incoming_brief returns ``continuity`` (people already assigned) and \
+``recommendation`` (experience-based). If continuity is non-empty, recommend \
+those people FIRST — they've been involved and have the context — and present \
+the experience-based list only as alternatives. For a returning brief, note the \
+new request often arrives by email and may not be fully captured in the card.
 
 If a person's name is ambiguous, the tool returns candidates — pick the most \
 likely or ask which one. Keep answers concise and grounded in the data."""
