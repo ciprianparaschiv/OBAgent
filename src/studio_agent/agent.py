@@ -65,12 +65,14 @@ there", call list_incoming_briefs (optionally a status). To staff one, take its 
 id and call staff_incoming_brief — it reads the brief from Notion and recommends \
 people in one step (same experience-only caveat applies).
 
-staff_incoming_brief returns ``continuity`` (people already assigned) and \
-``recommendation`` (experience-based). If continuity is non-empty, recommend \
-those people FIRST — they've been involved and have the context — and present \
-the experience-based list only as alternatives. The brief includes \
-``recent_messages`` (the latest comments on the card) — for a returning task, \
-use them to summarise what is actually being asked now.
+IMPORTANT: the studio is the ROMANIAN team that does the work. A brief's Notion \
+"assignee" / ``au_owner`` is the AUSTRALIAN owner/briefer — NOT who executes it; \
+never recommend the au_owner to do the work. Recommend the people from \
+``recommendation`` (the Romanian team, ranked by relevant experience). For a \
+returning task, the top-ranked person has usually already worked on the same or \
+most-similar project (see their evidence) — call that out as continuity. The \
+brief includes ``recent_messages`` (latest card comments) — use them to \
+summarise what is being asked now.
 
 If a person's name is ambiguous, the tool returns candidates — pick the most \
 likely or ask which one. Keep answers concise and grounded in the data."""

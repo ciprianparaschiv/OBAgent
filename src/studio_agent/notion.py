@@ -51,9 +51,10 @@ _RETURNING_MIN_MESSAGES = 2
 _comments_disabled = False  # set once if the integration lacks "Read comments"
 
 
-def _is_returning(status: str | None, assignee: str | None, messages: int | None) -> bool:
-    if assignee and status == "To Do":
-        return True
+def _is_returning(messages: int | None) -> bool:
+    # A real back-and-forth thread means the task has been iterated on / returned.
+    # (Status/assignee aren't reliable: the assignee is the AU owner, set on every
+    # card — including brand-new ones — so it can't distinguish new from returned.)
     return messages is not None and messages >= _RETURNING_MIN_MESSAGES
 
 
@@ -162,9 +163,8 @@ def _summary(
         # isn't granted to the integration.
         "messages": messages,
         "latest_message": (latest[:200] if latest else None),
-        # Returning/iterative: flipped back to "To Do" while assigned, OR has a
-        # back-and-forth comment thread.
-        "returning": _is_returning(status, assignee, messages),
+        # Returning/iterative: a real back-and-forth comment thread.
+        "returning": _is_returning(messages),
         # Discipline from the board (set by the caller); None if unknown.
         "discipline": discipline,
         "url": row.get("url"),

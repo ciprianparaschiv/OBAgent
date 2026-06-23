@@ -118,16 +118,19 @@ def staff_incoming_brief(brief_id: str, top_k: int = 5) -> dict[str, Any]:
     brief = notion.get_brief(brief_id)
     if not brief:
         return {"brief": None, "error": "Brief not found or Notion is not configured."}
-    # If someone is already assigned, that's the continuity pick (they have the
-    # context); the experience-based ranking is the set of alternatives.
-    assignee = brief.get("assignee")
-    continuity = [a.strip() for a in assignee.split(",")] if assignee else []
+    # NOTE: the Notion "assignee" is the AUSTRALIAN owner/briefer, not who does the
+    # work. The work is done by the Romanian team — that's the experience-based
+    # recommendation below. The assignee is returned only as AU-side context.
     recommendation = repo.recommend_staffing(
         brief.get("brief_text") or brief["title"],
         top_k=top_k,
         discipline=brief.get("discipline"),
     )
-    return {"brief": brief, "continuity": continuity, "recommendation": recommendation}
+    return {
+        "brief": brief,
+        "au_owner": brief.get("assignee"),
+        "recommendation": recommendation,
+    }
 
 
 def main() -> None:

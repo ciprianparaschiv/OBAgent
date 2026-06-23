@@ -192,16 +192,10 @@ A human makes every staffing decision.</p>
           ? '<a href="' + esc(b.url) + '" target="_blank" rel="noopener">' + esc(b.title) + '</a>'
           : esc(b.title);
         const badge = b.returning ? '<span class="badge">↩ returning</span> ' : '';
-        let body;
-        if (b.assignee) {
-          // Someone is already involved → recommend continuity first.
-          const note = b.returning ? ' (came back — the new request may be in email)' : '';
-          body = '<div class="s cont"><b>Continuity:</b> ' + esc(b.assignee)
-               + ' — already involved, recommended to continue' + note + '</div>'
-               + '<div class="s muted"><b>Other relevant experience:</b> ' + esc(exp) + '</div>';
-        } else {
-          body = '<div class="s"><b>Suggested:</b> ' + esc(exp) + '</div>';
-        }
+        // The RO team does the work → suggestions are the recommendation. The
+        // Notion assignee is the AU owner/briefer, shown only as context.
+        const body = '<div class="s"><b>Suggested (RO team):</b> ' + esc(exp) + '</div>'
+          + (b.assignee ? '<div class="s muted">AU owner: ' + esc(b.assignee) + '</div>' : '');
         const msgs = (b.messages != null && b.messages > 0) ? ' · 💬 ' + b.messages : '';
         const last = b.latest_message
           ? '<div class="s muted">Last message: “' + esc(b.latest_message) + '”</div>' : '';

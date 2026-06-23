@@ -235,8 +235,8 @@ def test_role_and_infer_helpers():
 
 def test_is_returning_logic():
     from studio_agent import notion as nt
-    assert nt._is_returning("To Do", "Alex", None) is True       # flipped back, assigned
-    assert nt._is_returning("In Progress", "Alex", None) is False  # assigned, not returned
-    assert nt._is_returning("Under Review", None, 3) is True      # back-and-forth thread
-    assert nt._is_returning("To Do", None, 0) is False            # brand-new, no messages
-    assert nt._is_returning("To Do", None, None) is False         # comments unavailable
+    assert nt._is_returning(3) is True       # back-and-forth thread => returning
+    assert nt._is_returning(2) is True
+    assert nt._is_returning(1) is False      # just the initial post
+    assert nt._is_returning(0) is False
+    assert nt._is_returning(None) is False   # comments unavailable
