@@ -64,7 +64,8 @@ async def _poll_once(top_k: int = 3) -> None:
             continue  # already triaged; status and last-edited both unchanged
         full = await asyncio.to_thread(notion.get_brief, b["id"])
         text = (full or {}).get("brief_text") or b["title"]
-        rec = await asyncio.to_thread(repo.recommend_staffing, text, 20, top_k)
+        disc = b.get("discipline") or (full or {}).get("discipline")
+        rec = await asyncio.to_thread(repo.recommend_staffing, text, 20, top_k, disc)
         _triage[b["id"]] = {
             "brief": b,
             "suggestions": [

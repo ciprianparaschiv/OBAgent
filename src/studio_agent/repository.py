@@ -430,6 +430,43 @@ def list_person_projects(
 # ---------------------------------------------------------------------------
 
 
+def _role_discipline(role: str | None) -> str | None:
+    """Map a person's usertype to 'design' or 'development' (or None)."""
+    r = (role or "").lower()
+    if any(k in r for k in ("develop", "php", "wordpress", "front-end", "frontend", "tester", "engineer")):
+        return "development"
+    if "design" in r:
+        return "design"
+    return None
+
+
+def _project_discipline(discipline_str: str | None) -> str | None:
+    """Classify a project's worktype/discipline string as design vs development."""
+    d = (discipline_str or "").lower()
+    if "develop" in d:
+        return "development"
+    if "design" in d:
+        return "design"
+    return None
+
+
+def _infer_discipline(text: str | None) -> str | None:
+    """Best-effort discipline of a brief from its text (development takes priority,
+    since dev briefs are often '… Design - Development')."""
+    t = (text or "").lower()
+    if any(k in t for k in (
+        "develop", "wordpress", "shopify", "woocommerce", " cms", "integration",
+        "html", "plugin", "back-end", "backend", "api ", "staging", "page build",
+    )):
+        return "development"
+    if any(k in t for k in (
+        "design", "creative", "static", "video", "banner", "mockup", "figma",
+        "animation", "carousel", "artwork", "graphic", "ad set",
+    )):
+        return "design"
+    return None
+
+
 def _recency_factor(last_ts: int, now: float) -> float:
     """Weight recent experience higher (and treat very stale work as less relevant)."""
     if not last_ts:
@@ -443,7 +480,7 @@ def _recency_factor(last_ts: int, now: float) -> float:
 
 
 def recommend_staffing(
-    brief: str, similar_limit: int = 20, top_k: int = 5
+    brief: str, similar_limit: int = 20, top_k: int = 5, discipline: str | None = None
 ) -> dict[str, Any]:
     """Suggest who to staff on an incoming brief, from PMS experience only.
 
@@ -452,6 +489,11 @@ def recommend_staffing(
     similarity and recency, with a bonus for having led similar work. Returns a
     shortlist with evidence. Does NOT consider availability/leave — a human
     decides; that signal needs the leave planner (a separate source).
+
+    ``discipline`` ("design"|"development") restricts the shortlist to people of
+    that discipline. If None, it's inferred from the brief text, falling back to
+    the dominant discipline of the similar projects — so a dev brief returns
+    developers and a design brief returns designers, not a mix.
     """
     similar = search_projects(brief, limit=similar_limit)
     if not similar:
@@ -526,22 +568,45 @@ def recommend_staffing(
         a["relevant_hours"] = round(a["relevant_hours"], 1)
         a["weighted_hours"] = round(a["weighted_hours"], 2)
         a["score"] = round(a["weighted_hours"] * rec * lead_bonus, 2)
+        a["discipline"] = _role_discipline(a["role"])
         a["evidence"] = sorted(
             a.pop("_ev"), key=lambda e: e["similarity"] * e["hours"], reverse=True
         )[:3]
         candidates.append(a)
 
     candidates.sort(key=lambda c: c["score"], reverse=True)
+
+    # Determine the brief's discipline: explicit > inferred from text > dominant
+    # discipline of the similar projects.
+    target = discipline or _infer_discipline(brief)
+    if not target:
+        counts: dict[str, int] = {}
+        for s in similar:
+            d = _project_discipline(s.get("discipline"))
+            if d:
+                counts[d] = counts.get(d, 0) + 1
+        if len(counts) == 1 or (len(counts) == 2 and counts["design"] != counts["development"]):
+            target = max(counts, key=counts.get)
+
+    matched = [c for c in candidates if c["discipline"] == target] if target else []
+    filtered = bool(target and matched)
+    final = matched if filtered else candidates
+
+    note = (
+        "Ranked by relevant past experience only: hours on similar projects, "
+        "weighted by similarity and recency, with a bonus for leading. Does NOT "
+        "account for current availability or leave — a human makes the final call."
+    )
+    if filtered:
+        note = f"Showing {target} people only. " + note
+
     return _deep_clean(
         {
             "brief": brief,
             "similar_projects_considered": len(ids),
-            "candidates": candidates[:top_k],
-            "note": (
-                "Ranked by relevant past experience only: hours on similar "
-                "projects, weighted by similarity and recency, with a bonus for "
-                "leading. Does NOT account for current availability or leave — "
-                "a human makes the final call."
-            ),
+            "discipline": target,
+            "discipline_filtered": filtered,
+            "candidates": final[:top_k],
+            "note": note,
         }
     )

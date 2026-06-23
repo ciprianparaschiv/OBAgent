@@ -187,7 +187,7 @@ A human makes every staffing decision.</p>
       list.innerHTML = (d.briefs || []).map(item => {
         const b = item.brief;
         const sugg = (item.suggestions || []).map(s => s.name).join(', ') || '—';
-        const meta = [b.client, b.priority, b.status].filter(Boolean).join(' · ');
+        const meta = [b.client, b.discipline, b.priority, b.status].filter(Boolean).join(' · ');
         const titleHtml = b.url
           ? '<a href="' + esc(b.url) + '" target="_blank" rel="noopener">' + esc(b.title) + '</a>'
           : esc(b.title);

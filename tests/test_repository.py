@@ -200,3 +200,34 @@ def test_get_brief_assembles_text():
         pytest.skip("no briefs available")
     d = notion.get_brief(briefs[0]["id"])
     assert d and "brief_text" in d and d["title"]
+
+
+def test_recommend_staffing_development_returns_developers():
+    res = repo.recommend_staffing(
+        "WordPress landing page development build with plugin integration", top_k=6
+    )
+    assert res["discipline"] == "development"
+    assert res["candidates"], "expected developer candidates"
+    assert all(c["discipline"] == "development" for c in res["candidates"])
+
+
+def test_recommend_staffing_design_returns_designers():
+    res = repo.recommend_staffing(
+        "Social media static ad creatives and banner design", top_k=6
+    )
+    assert res["discipline"] == "design"
+    assert res["candidates"]
+    assert all(c["discipline"] == "design" for c in res["candidates"])
+
+
+def test_recommend_staffing_explicit_discipline_overrides():
+    res = repo.recommend_staffing("email newsletter", top_k=5, discipline="development")
+    assert res["discipline"] == "development"
+    assert all(c["discipline"] == "development" for c in res["candidates"])
+
+
+def test_role_and_infer_helpers():
+    assert repo._role_discipline("Front-end Developer") == "development"
+    assert repo._role_discipline("Web Designer") == "design"
+    assert repo._infer_discipline("Shopify store build") == "development"
+    assert repo._infer_discipline("static banner creative") == "design"

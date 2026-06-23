@@ -33,6 +33,17 @@ _BRIEF_FIELDS = (
 )
 _CLIENT_FIELD = "Harvest Time Tracking Project Name"
 
+# Known RO boards -> discipline (the most reliable signal for a brief). Keys are
+# database ids with dashes stripped. Unknown boards fall back to text inference.
+_BOARD_DISCIPLINE = {
+    "14b35e677f07802eb271e98a8240e65e": "design",       # RO Design - Task List
+    "14b35e677f07805183c6db499173f309": "development",  # RO Development - Task List
+}
+
+
+def _board_discipline(db_id: str | None) -> str | None:
+    return _BOARD_DISCIPLINE.get((db_id or "").replace("-", "").lower())
+
 
 def available() -> bool:
     return bool(notion_settings().token)
@@ -93,7 +104,7 @@ def _title(props: dict[str, Any]) -> str:
     return ""
 
 
-def _summary(row: dict[str, Any]) -> dict[str, Any]:
+def _summary(row: dict[str, Any], discipline: str | None = None) -> dict[str, Any]:
     p = row.get("properties", {})
     status = _plain(p["Status"]) if "Status" in p else None
     assignee = _plain(p["Assignee"]) if "Assignee" in p else None
@@ -109,6 +120,8 @@ def _summary(row: dict[str, Any]) -> dict[str, Any]:
         # A brief that already has an assignee but is back in "To Do" is a
         # returning/revision (new briefs from the form have no assignee yet).
         "returning": bool(assignee) and status == "To Do",
+        # Discipline from the board (set by the caller); None if unknown.
+        "discipline": discipline,
         "url": row.get("url"),
     }
 
@@ -131,7 +144,8 @@ def list_incoming_briefs(limit: int = 15, status: str | None = None) -> list[dic
             data = _post(f"/databases/{db}/query", payload)
         except httpx.HTTPError:
             continue  # a board may not be shared / may lack the property
-        out.extend(_summary(r) for r in data.get("results", []))
+        disc = _board_discipline(db)
+        out.extend(_summary(r, disc) for r in data.get("results", []))
     out.sort(key=lambda b: b.get("created") or "", reverse=True)
     return out[:limit]
 
@@ -142,7 +156,8 @@ def get_brief(page_id: str) -> dict[str, Any] | None:
         return None
     page = _get(f"/pages/{page_id}")
     p = page.get("properties", {})
-    summary = _summary(page)
+    parent_db = (page.get("parent") or {}).get("database_id")
+    summary = _summary(page, _board_discipline(parent_db))
 
     parts: list[str] = []
     title = summary["title"]

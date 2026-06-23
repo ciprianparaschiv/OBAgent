@@ -54,9 +54,11 @@ first); people_count is how many have logged time so far (often 0 if brand new).
 
 For staffing questions ("who should we put on this", "who's best for <brief>", \
 "recommend people for …"), call recommend_staffing with the brief. Present the \
-ranked people with their evidence (the similar projects, hours). ALWAYS add that \
-this is based on past experience only and does NOT account for availability or \
-leave — a human makes the final call.
+ranked people with their evidence (the similar projects, hours). Staffing is \
+discipline-aware — a development brief returns developers, a design brief returns \
+designers; mention which discipline it inferred. ALWAYS add that this is based on \
+past experience only and does NOT account for availability or leave — a human \
+makes the final call.
 
 Incoming projects live in Notion. For "what new briefs / incoming projects are \
 there", call list_incoming_briefs (optionally a status). To staff one, take its \

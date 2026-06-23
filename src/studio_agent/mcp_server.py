@@ -35,17 +35,23 @@ def search_projects(query: str, limit: int = 10) -> list[dict[str, Any]]:
 
 
 @mcp.tool()
-def recommend_staffing(brief: str, top_k: int = 5) -> dict[str, Any]:
+def recommend_staffing(
+    brief: str, top_k: int = 5, discipline: str | None = None
+) -> dict[str, Any]:
     """Suggest who to staff on an incoming project brief, from PMS experience.
 
     Finds similar past projects and ranks currently-active people by relevant
     experience (hours on similar work, weighted by similarity and recency, plus a
     lead bonus). Returns a shortlist, each with evidence (the similar projects they
-    worked on, hours, similarity). IMPORTANT: this reflects experience only — it
-    does NOT know who is available or on leave; always present it as advice for a
-    human to decide, and say availability wasn't considered.
+    worked on, hours, similarity).
+
+    Discipline-aware: a development brief returns developers and a design brief
+    returns designers (not a mix). Pass ``discipline`` ("design"|"development") to
+    force it; otherwise it's inferred from the brief. IMPORTANT: reflects
+    experience only — it does NOT know who is available or on leave; present it as
+    advice for a human, and say availability wasn't considered.
     """
-    return repo.recommend_staffing(brief, top_k=top_k)
+    return repo.recommend_staffing(brief, top_k=top_k, discipline=discipline)
 
 
 @mcp.tool()
@@ -111,7 +117,11 @@ def staff_incoming_brief(brief_id: str, top_k: int = 5) -> dict[str, Any]:
     brief = notion.get_brief(brief_id)
     if not brief:
         return {"brief": None, "error": "Brief not found or Notion is not configured."}
-    recommendation = repo.recommend_staffing(brief.get("brief_text") or brief["title"], top_k=top_k)
+    recommendation = repo.recommend_staffing(
+        brief.get("brief_text") or brief["title"],
+        top_k=top_k,
+        discipline=brief.get("discipline"),
+    )
     return {"brief": brief, "recommendation": recommendation}
 
 
