@@ -16,7 +16,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from . import notion, repository as repo
+from . import notion, repository as repo, staffing
 
 mcp = FastMCP("studio-pms")
 
@@ -107,29 +107,28 @@ def list_incoming_briefs(limit: int = 15, status: str | None = None) -> list[dic
 
 @mcp.tool()
 def staff_incoming_brief(brief_id: str, top_k: int = 5) -> dict[str, Any]:
-    """Recommend who to staff on a specific incoming Notion brief.
+    """Recommend who to staff on a specific incoming Notion brief (two tiers).
 
-    Fetches the brief from Notion (by id, from list_incoming_briefs) and runs the
-    staffing recommendation against PMS history. Returns: ``continuity`` (people
-    already assigned — if any, recommend THEM first, since they have the context),
-    and ``recommendation`` (the experience-based shortlist as alternatives).
-    Experience-based only; does NOT consider availability/leave — a human decides.
+    Reads the brief + its comment thread and returns:
+      * ``main``      — the Romanian person already on this task (from the comment
+                        authors), matched to the task's CURRENT discipline (which
+                        the model infers from the thread; a design task may have
+                        become development). Empty for a brand-new task.
+      * ``secondary`` — experienced RO alternatives who could take it over.
+      * ``au_owner``  — the Australian owner/briefer (context only, never a pick).
+    Experience-based; does NOT consider availability/leave — a human decides.
     """
     brief = notion.get_brief(brief_id)
     if not brief:
         return {"brief": None, "error": "Brief not found or Notion is not configured."}
-    # NOTE: the Notion "assignee" is the AUSTRALIAN owner/briefer, not who does the
-    # work. The work is done by the Romanian team — that's the experience-based
-    # recommendation below. The assignee is returned only as AU-side context.
-    recommendation = repo.recommend_staffing(
-        brief.get("brief_text") or brief["title"],
-        top_k=top_k,
-        discipline=brief.get("discipline"),
-    )
+    tri = staffing.triage_brief(brief, brief.get("comments") or [], top_k=top_k)
+    brief.pop("comments", None)  # keep the payload small (recent_messages remains)
     return {
         "brief": brief,
         "au_owner": brief.get("assignee"),
-        "recommendation": recommendation,
+        "discipline": tri["discipline"],
+        "main": tri["main"],
+        "secondary": tri["secondary"],
     }
 
 

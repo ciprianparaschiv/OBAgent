@@ -120,6 +120,33 @@ def resolve_person(name_or_id: str | int) -> dict[str, Any] | None:
     return rows[0] if len(rows) == 1 else None
 
 
+def _norm_name(name: str | None) -> str:
+    return " ".join((name or "").lower().split())
+
+
+def active_people_by_name() -> dict[str, dict[str, Any]]:
+    """Map normalised name -> {user_id, name, role, discipline} for active people.
+
+    Used to match Notion comment authors (the RO team responding on a card) to our
+    people, and to know each one's discipline.
+    """
+    rows = query(
+        """SELECT u.user_id, u.user_name AS name, ut.usertype_name AS role
+             FROM user u
+             LEFT JOIN usertype ut ON ut.usertype_id = u.user_type
+            WHERE u.user_active = 1 AND u.user_deleted = 0"""
+    )
+    out: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        out[_norm_name(r["name"])] = {
+            "user_id": r["user_id"],
+            "name": r["name"],
+            "role": r["role"],
+            "discipline": _role_discipline(r["role"]),
+        }
+    return out
+
+
 def list_people(limit: int = 100) -> list[dict[str, Any]]:
     return query(
         """SELECT u.user_id, u.user_name, u.user_email, ut.usertype_name AS role,

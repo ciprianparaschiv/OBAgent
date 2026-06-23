@@ -77,7 +77,8 @@ def fetch_comments(page_id: str) -> list[dict[str, Any]] | None:
     out: list[dict[str, Any]] = []
     for c in data.get("results", []):
         text = "".join(t.get("plain_text", "") for t in c.get("rich_text", [])).strip()
-        out.append({"date": (c.get("created_time") or "")[:10], "text": text})
+        author = ((c.get("display_name") or {}).get("resolved_name")) or None
+        out.append({"date": (c.get("created_time") or "")[:10], "text": text, "author": author})
     return out
 
 
@@ -206,8 +207,9 @@ def get_brief(page_id: str) -> dict[str, Any] | None:
     parent_db = (page.get("parent") or {}).get("database_id")
     comments = fetch_comments(page_id)
     summary = _summary(page, _board_discipline(parent_db), comments)
-    # Expose the recent discussion (the actual follow-up requests) so callers can
-    # see what's being asked on a returning task.
+    # Full thread (for discipline inference + responder matching) and a short tail
+    # for display.
+    summary["comments"] = comments or []
     summary["recent_messages"] = (comments or [])[-5:]
 
     parts: list[str] = []

@@ -67,12 +67,12 @@ people in one step (same experience-only caveat applies).
 
 IMPORTANT: the studio is the ROMANIAN team that does the work. A brief's Notion \
 "assignee" / ``au_owner`` is the AUSTRALIAN owner/briefer — NOT who executes it; \
-never recommend the au_owner to do the work. Recommend the people from \
-``recommendation`` (the Romanian team, ranked by relevant experience). For a \
-returning task, the top-ranked person has usually already worked on the same or \
-most-similar project (see their evidence) — call that out as continuity. The \
-brief includes ``recent_messages`` (latest card comments) — use them to \
-summarise what is being asked now.
+never recommend the au_owner. staff_incoming_brief returns two tiers: ``main`` \
+(the RO person already on this task, from the comment thread, matched to the \
+task's current discipline) and ``secondary`` (RO people who could take it over). \
+Lead with ``main`` if present; otherwise present ``secondary``. ``discipline`` is \
+the model's read of the thread (a design task may have moved to development). Use \
+``recent_messages`` to summarise what is being asked now.
 
 If a person's name is ambiguous, the tool returns candidates — pick the most \
 likely or ask which one. Keep answers concise and grounded in the data."""

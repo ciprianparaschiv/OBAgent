@@ -240,3 +240,51 @@ def test_is_returning_logic():
     assert nt._is_returning(1) is False      # just the initial post
     assert nt._is_returning(0) is False
     assert nt._is_returning(None) is False   # comments unavailable
+
+
+# --- two-tier staffing (main / secondary) ---------------------------------
+
+def test_active_people_by_name_has_known_person():
+    people = repo.active_people_by_name()
+    assert people, "expected active people"
+    sample = next(iter(people.values()))
+    assert {"user_id", "name", "role", "discipline"} <= sample.keys()
+
+
+def test_triage_brief_main_is_responder_secondary_excludes(monkeypatch):
+    from studio_agent import analysis, staffing
+    people = repo.active_people_by_name()
+    designer = next(p for p in people.values() if p["discipline"] == "design")
+    monkeypatch.setattr(analysis, "infer_discipline", lambda *a, **k: "design")
+    brief = {
+        "title": "Social static ad creatives",
+        "discipline": "design",
+        "brief_text": "social media static ad creative design banners",
+    }
+    comments = [
+        {"author": designer["name"], "text": "here are the statics"},
+        {"author": "Ann Thai", "text": "some changes please"},  # AU, ignored
+    ]
+    tri = staffing.triage_brief(brief, comments, top_k=4)
+    assert tri["discipline"] == "design"
+    assert designer["name"] in [m["name"] for m in tri["main"]]
+    assert designer["name"] not in [s["name"] for s in tri["secondary"]]
+
+
+def test_triage_brief_flip_to_dev_drops_designer_from_main(monkeypatch):
+    from studio_agent import analysis, staffing
+    people = repo.active_people_by_name()
+    designer = next(p for p in people.values() if p["discipline"] == "design")
+    monkeypatch.setattr(analysis, "infer_discipline", lambda *a, **k: "development")
+    brief = {"title": "LP build", "discipline": "design",
+             "brief_text": "wordpress landing page development build"}
+    comments = [{"author": designer["name"], "text": "design is done"}]
+    tri = staffing.triage_brief(brief, comments, top_k=5)
+    assert tri["discipline"] == "development"
+    # a designer is not the main pick for a development task
+    assert designer["name"] not in [m["name"] for m in tri["main"]]
+
+
+def test_analysis_quota_status_shape():
+    from studio_agent import analysis
+    assert set(analysis.quota_status().keys()) == {"exceeded", "message"}

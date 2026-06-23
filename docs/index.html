@@ -53,6 +53,8 @@
   .brief .cont { color: #b26a00; }
   .badge { font-size: .7rem; background: #b26a0022; color: #b26a00; border: 1px solid #b26a0055;
            border-radius: 6px; padding: .05rem .35rem; vertical-align: middle; }
+  .qbanner { background: #b26a0018; border: 1px solid #b26a0055; color: #b26a00;
+             border-radius: 8px; padding: .5rem .7rem; margin: .5rem 0; font-size: .8rem; }
 </style>
 </head>
 <body>
@@ -182,19 +184,26 @@ A human makes every staffing decision.</p>
       if(r.status === 401){ showLogin(); return; }
       const d = await r.json();
       if(!d.watching){ st.textContent = 'watcher off (Notion not configured on this backend)'; list.innerHTML = ''; return; }
+      const q = d.ai_quota || {};
       st.textContent = (d.last_run ? 'updated ' + d.last_run : 'starting…') + ' · ' + d.count + ' briefs'
         + (d.error ? ' · error: ' + d.error : '');
-      list.innerHTML = (d.briefs || []).map(item => {
+      const banner = (q.exceeded && q.message) ? '<div class="qbanner">⚠ ' + esc(q.message) + '</div>' : '';
+      list.innerHTML = banner + (d.briefs || []).map(item => {
         const b = item.brief;
-        const exp = (item.suggestions || []).map(s => s.name).join(', ') || '—';
-        const meta = [b.client, b.discipline, b.priority, b.status].filter(Boolean).join(' · ');
+        const disc = item.discipline || b.discipline;
+        const mainNames = (item.main || []).map(p => p.name).join(', ');
+        const secNames = (item.secondary || []).map(p => p.name).join(', ') || '—';
+        const meta = [b.client, disc, b.priority, b.status].filter(Boolean).join(' · ');
         const titleHtml = b.url
           ? '<a href="' + esc(b.url) + '" target="_blank" rel="noopener">' + esc(b.title) + '</a>'
           : esc(b.title);
         const badge = b.returning ? '<span class="badge">↩ returning</span> ' : '';
-        // The RO team does the work → suggestions are the recommendation. The
-        // Notion assignee is the AU owner/briefer, shown only as context.
-        const body = '<div class="s"><b>Suggested (RO team):</b> ' + esc(exp) + '</div>'
+        // Main = the RO person already on it (from comments); secondary = who could
+        // take over. The Notion assignee is the AU owner, shown only as context.
+        const mainLine = mainNames
+          ? '<div class="s cont"><b>Main (already on it):</b> ' + esc(mainNames) + '</div>' : '';
+        const body = mainLine
+          + '<div class="s"><b>Could take over:</b> ' + esc(secNames) + '</div>'
           + (b.assignee ? '<div class="s muted">AU owner: ' + esc(b.assignee) + '</div>' : '');
         const msgs = (b.messages != null && b.messages > 0) ? ' · 💬 ' + b.messages : '';
         const last = b.latest_message

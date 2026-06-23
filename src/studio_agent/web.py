@@ -25,8 +25,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
-from . import notion
-from . import repository as repo
+from . import analysis, notion, staffing
 from .agent import run as agent_run
 from .config import web_auth
 from .llm import model_name
@@ -42,7 +41,11 @@ _INDEX = Path(__file__).resolve().parents[2] / "docs" / "index.html"
 # --------------------------------------------------------------------------- #
 
 _triage: dict[str, dict] = {}
-_watch = {"last_run": None, "last_error": None, "enabled": False}
+_watch = {"last_run": None, "last_error": None, "enabled": False, "ai_quota": None}
+
+# Max briefs to (re)analyse with the LLM per poll, so a cold start doesn't burst
+# the whole free-tier quota at once; the rest are picked up on later polls.
+_MAX_AI_PER_POLL = 8
 
 
 def _now_str() -> str:
@@ -50,9 +53,15 @@ def _now_str() -> str:
 
 
 async def _poll_once(top_k: int = 3) -> None:
-    """One read-only sweep: new/changed briefs -> staffing shortlist, cached."""
+    """One read-only sweep: changed briefs -> two-tier staffing, cached.
+
+    Per changed brief: read the thread, infer current discipline (LLM), and split
+    into main (RO person already on it) + secondary (could take over).
+    """
+    analysis.reset_quota()  # retry once per poll; short-circuits after a 429
     briefs = await asyncio.to_thread(notion.list_incoming_briefs, 25)
     current = set()
+    processed = 0
     for b in briefs:
         current.add(b["id"])
         cached = _triage.get(b["id"])
@@ -63,21 +72,23 @@ async def _poll_once(top_k: int = 3) -> None:
             and cached["brief"].get("messages") == b.get("messages")
         ):
             continue  # already triaged; status, last-edited and messages unchanged
+        if processed >= _MAX_AI_PER_POLL:
+            continue  # leave for a later poll (don't cache) to spread LLM/quota load
+        processed += 1
         full = await asyncio.to_thread(notion.get_brief, b["id"])
-        text = (full or {}).get("brief_text") or b["title"]
-        disc = b.get("discipline") or (full or {}).get("discipline")
-        rec = await asyncio.to_thread(repo.recommend_staffing, text, 20, top_k, disc)
+        comments = (full or {}).get("comments") or []
+        tri = await asyncio.to_thread(staffing.triage_brief, full or b, comments, top_k)
         _triage[b["id"]] = {
             "brief": b,
-            "suggestions": [
-                {"name": c["name"], "role": c.get("role"), "score": c["score"]}
-                for c in rec["candidates"]
-            ],
+            "discipline": tri["discipline"],
+            "main": tri["main"],
+            "secondary": tri["secondary"],
             "computed_at": _now_str(),
         }
     for gone in set(_triage) - current:  # drop briefs no longer on the boards
         _triage.pop(gone, None)
     _watch["last_run"] = _now_str()
+    _watch["ai_quota"] = analysis.quota_status()
 
 
 async def _watch_loop(interval: int) -> None:
@@ -176,6 +187,7 @@ def incoming(_: None = Depends(require_auth)) -> JSONResponse:
             "watching": _watch["enabled"],
             "last_run": _watch["last_run"],
             "error": _watch["last_error"],
+            "ai_quota": _watch["ai_quota"],
             "count": len(items),
             "briefs": items,
         }
