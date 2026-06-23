@@ -60,8 +60,9 @@ async def _poll_once(top_k: int = 3) -> None:
             cached
             and cached["brief"].get("status") == b.get("status")
             and cached["brief"].get("last_edited") == b.get("last_edited")
+            and cached["brief"].get("messages") == b.get("messages")
         ):
-            continue  # already triaged; status and last-edited both unchanged
+            continue  # already triaged; status, last-edited and messages unchanged
         full = await asyncio.to_thread(notion.get_brief, b["id"])
         text = (full or {}).get("brief_text") or b["title"]
         disc = b.get("discipline") or (full or {}).get("discipline")

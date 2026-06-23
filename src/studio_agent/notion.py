@@ -45,6 +45,38 @@ def _board_discipline(db_id: str | None) -> str | None:
     return _BOARD_DISCIPLINE.get((db_id or "").replace("-", "").lower())
 
 
+# A task with this many comments (messages) is treated as a returning/iterative
+# task (back-and-forth), in addition to the "flipped back to To Do" signal.
+_RETURNING_MIN_MESSAGES = 2
+_comments_disabled = False  # set once if the integration lacks "Read comments"
+
+
+def _is_returning(status: str | None, assignee: str | None, messages: int | None) -> bool:
+    if assignee and status == "To Do":
+        return True
+    return messages is not None and messages >= _RETURNING_MIN_MESSAGES
+
+
+def comment_count(page_id: str) -> int | None:
+    """Number of comments (messages) on a page, or None if unavailable.
+
+    Requires the integration's "Read comments" capability. On 403 we stop trying
+    for this process so we don't spam failing calls.
+    """
+    global _comments_disabled
+    if _comments_disabled or not available() or not page_id:
+        return None
+    try:
+        data = _get(f"/comments?block_id={page_id}&page_size=100")
+        return len(data.get("results", []))
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 403:
+            _comments_disabled = True
+        return None
+    except httpx.HTTPError:
+        return None
+
+
 def available() -> bool:
     return bool(notion_settings().token)
 
@@ -104,7 +136,9 @@ def _title(props: dict[str, Any]) -> str:
     return ""
 
 
-def _summary(row: dict[str, Any], discipline: str | None = None) -> dict[str, Any]:
+def _summary(
+    row: dict[str, Any], discipline: str | None = None, messages: int | None = None
+) -> dict[str, Any]:
     p = row.get("properties", {})
     status = _plain(p["Status"]) if "Status" in p else None
     assignee = _plain(p["Assignee"]) if "Assignee" in p else None
@@ -117,9 +151,11 @@ def _summary(row: dict[str, Any], discipline: str | None = None) -> dict[str, An
         "assignee": assignee or None,
         "created": (row.get("created_time") or "")[:10] or None,
         "last_edited": (row.get("last_edited_time") or "")[:16] or None,
-        # A brief that already has an assignee but is back in "To Do" is a
-        # returning/revision (new briefs from the form have no assignee yet).
-        "returning": bool(assignee) and status == "To Do",
+        # Number of comments (messages); None if "Read comments" isn't granted.
+        "messages": messages,
+        # Returning/iterative: flipped back to "To Do" while assigned, OR has a
+        # back-and-forth comment thread.
+        "returning": _is_returning(status, assignee, messages),
         # Discipline from the board (set by the caller); None if unknown.
         "discipline": discipline,
         "url": row.get("url"),
@@ -145,7 +181,9 @@ def list_incoming_briefs(limit: int = 15, status: str | None = None) -> list[dic
         except httpx.HTTPError:
             continue  # a board may not be shared / may lack the property
         disc = _board_discipline(db)
-        out.extend(_summary(r, disc) for r in data.get("results", []))
+        out.extend(
+            _summary(r, disc, comment_count(r.get("id"))) for r in data.get("results", [])
+        )
     out.sort(key=lambda b: b.get("created") or "", reverse=True)
     return out[:limit]
 
@@ -157,7 +195,7 @@ def get_brief(page_id: str) -> dict[str, Any] | None:
     page = _get(f"/pages/{page_id}")
     p = page.get("properties", {})
     parent_db = (page.get("parent") or {}).get("database_id")
-    summary = _summary(page, _board_discipline(parent_db))
+    summary = _summary(page, _board_discipline(parent_db), comment_count(page_id))
 
     parts: list[str] = []
     title = summary["title"]

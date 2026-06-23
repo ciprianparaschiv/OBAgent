@@ -202,8 +202,9 @@ A human makes every staffing decision.</p>
         } else {
           body = '<div class="s"><b>Suggested:</b> ' + esc(exp) + '</div>';
         }
+        const msgs = (b.messages != null && b.messages > 0) ? ' · 💬 ' + b.messages : '';
         return '<div class="brief"><div class="t">' + badge + titleHtml + '</div>'
-          + '<div class="m">' + esc(meta) + (b.created ? ' · ' + b.created : '') + '</div>'
+          + '<div class="m">' + esc(meta) + msgs + (b.created ? ' · ' + b.created : '') + '</div>'
           + body + '</div>';
       }).join('') || '<p class="muted">No incoming briefs yet.</p>';
     } catch(e){ st.textContent = 'not reachable'; }

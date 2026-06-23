@@ -231,3 +231,12 @@ def test_role_and_infer_helpers():
     assert repo._role_discipline("Web Designer") == "design"
     assert repo._infer_discipline("Shopify store build") == "development"
     assert repo._infer_discipline("static banner creative") == "design"
+
+
+def test_is_returning_logic():
+    from studio_agent import notion as nt
+    assert nt._is_returning("To Do", "Alex", None) is True       # flipped back, assigned
+    assert nt._is_returning("In Progress", "Alex", None) is False  # assigned, not returned
+    assert nt._is_returning("Under Review", None, 3) is True      # back-and-forth thread
+    assert nt._is_returning("To Do", None, 0) is False            # brand-new, no messages
+    assert nt._is_returning("To Do", None, None) is False         # comments unavailable
